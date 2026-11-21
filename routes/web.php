@@ -35,6 +35,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/alat', [EquipmentController::class, 'store'])->name('alat.store');
     Route::patch('/alat/{equipment}/toggle', [EquipmentController::class, 'toggle'])->name('alat.toggle');
     Route::delete('/alat/{equipment}', [EquipmentController::class, 'destroy'])->name('alat.destroy');
+    Route::delete('/alat-reset', [EquipmentController::class, 'reset'])->name('alat.reset');
 
     Route::get('/jadwal', [ScheduleController::class, 'index'])->name('jadwal.index');
     Route::get('/jadwal/berjalan', [ScheduleController::class, 'running'])->name('jadwal.running');

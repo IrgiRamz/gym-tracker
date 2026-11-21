@@ -41,6 +41,13 @@
 @if($grouped->isEmpty())
     <div class="text-center text-secondary py-4">Belum ada alat. Tambahkan alat pertama kamu di atas ya 💕</div>
 @endif
+
+@if($grouped->isNotEmpty())
+    <form method="POST" action="{{ route('alat.reset') }}" class="mt-4" data-confirm="Semua alat gym akan dihapus permanen dan daftarnya jadi kosong lagi dari 0. Kamu harus input ulang satu per satu, dan AI hanya akan memakai gerakan tanpa alat sampai ada alat baru. Yakin mau reset?" data-confirm-title="Reset semua alat gym?" data-confirm-yes="Ya, Reset Semua">@csrf @method('DELETE')
+        <button class="btn btn-outline-danger w-100 rounded-3"><i class="bi bi-arrow-counterclockwise"></i> Reset Semua Alat</button>
+    </form>
+    <div class="text-center text-secondary small mt-2 mb-3">Tombol ini menghapus seluruh daftar alat, misalnya kalau mau input ulang dari awal.</div>
+@endif
 @endsection
 
 @push('scripts')

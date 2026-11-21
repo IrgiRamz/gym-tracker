@@ -20,6 +20,7 @@
 | GET `/klien/{client}/riwayat` | ClientController@history | klien.history | auth | JSON history |
 | GET `/alat` · POST `/alat` | EquipmentController@index / store | alat.index, alat.store | auth | |
 | PATCH `/alat/{equipment}/toggle` · DELETE `/alat/{equipment}` | …@toggle / destroy | alat.toggle, alat.destroy | auth | |
+| DELETE `/alat-reset` | EquipmentController@reset | alat.reset | auth | hapus SEMUA alat (reset dari 0, pakai modal konfirmasi) |
 | GET `/jadwal?month=YYYY-MM` | ScheduleController@index | jadwal.index | auth | JSON jadwal sebulan |
 | GET `/jadwal/berjalan` | …@running | jadwal.running | auth | sesi yang sedang berjalan |
 | POST `/jadwal` | …@store | jadwal.store | auth | |
@@ -40,7 +41,7 @@ Halaman Blade (form biasa) memakai redirect + flash `success`; endpoint JSON (`/
 
 ## 2. Master Alat Gym (`/alat`, `EquipmentController`)
 
-- Tambah alat (nama + kategori via chips: Beban Bebas, Mesin Latihan, Kardio & Matras, Tanpa Alat); **toggle** ketersediaan (`is_available`) lewat **AJAX** (`api()` PATCH, controller membalas JSON bila `expectsJson`) sehingga halaman tidak reload dan posisi scroll tetap; tanpa JS/permintaan non-JSON controller tetap `back()` seperti biasa; hapus (modal konfirmasi lewat `data-confirm`).
+- Tambah alat (nama + kategori via chips: Beban Bebas, Mesin Latihan, Kardio & Matras, Tanpa Alat); **toggle** ketersediaan (`is_available`) lewat **AJAX** (`api()` PATCH, controller membalas JSON bila `expectsJson`) sehingga halaman tidak reload dan posisi scroll tetap; tanpa JS/permintaan non-JSON controller tetap `back()` seperti biasa; hapus (modal konfirmasi lewat `data-confirm`). Ada juga tombol **Reset Semua Alat** di bagian bawah daftar (hanya tampil bila ada alat): form DELETE ke `alat.reset` dengan modal konfirmasi `data-confirm` bergaya bahaya, menghapus **seluruh** alat sekaligus agar daftar bisa diinput ulang dari 0; selama daftar kosong, AI hanya memakai gerakan "Tanpa Alat".
 - **Integrasi AI**: `AiWorkoutService::generate()` mengambil `Equipment::where('is_available', true)->pluck('name')` dan memasukkannya ke *system prompt* Gemini ("WAJIB hanya memakai alat dari daftar berikut atau 'Tanpa Alat'"). Template cadangan juga hanya memakai alat yang tersedia (pencocokan kata kunci nama alat: `find()` memakai alat **pertama** yang namanya memuat kata kunci, bisa daftar kata kunci berurutan). Gunakan kata kunci yang spesifik (mis. `'lat pulldown'`, bukan `'lat'` yang ikut cocok dengan "Barbell & **Plate**"). Gerakan bodyweight memakai `kw = null` (alat "Tanpa Alat"); alat yang tidak ada → gerakan pengganti bodyweight atau dilewati.
 
 ## 3. Manajemen Klien (`/klien`, `ClientController`, `clients.blade.php`)

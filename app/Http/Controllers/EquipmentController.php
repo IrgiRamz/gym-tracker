@@ -52,4 +52,10 @@ class EquipmentController extends Controller
         $equipment->delete();
         return back()->with('success', 'Alat sudah dihapus.');
     }
+
+    public function reset()
+    {
+        Equipment::query()->delete();
+        return back()->with('success', 'Semua alat sudah dihapus. Daftarnya kosong lagi, silakan input ulang dari awal ya 🌸');
+    }
 }
