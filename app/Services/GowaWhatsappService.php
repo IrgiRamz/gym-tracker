@@ -64,8 +64,19 @@ class GowaWhatsappService
                     return false;
                 }
                 $results = $res->json('results');
-                // Ada perangkat WhatsApp yang terhubung -> aktif
-                return is_array($results) ? count($results) > 0 : true;
+                if (! is_array($results)) {
+                    return false;
+                }
+                // Instance GoWA ini dipakai bersama: /app/devices mengembalikan device SEMUA tenant.
+                // Aktif hanya bila device KITA (GOWA_DEVICE_ID) ada di daftar DAN jid-nya terisi
+                // (jid kosong = device terdaftar tapi belum di-scan/link ke WhatsApp).
+                $deviceId = config('services.gowa.device_id');
+                foreach ($results as $d) {
+                    if (($d['device'] ?? null) === $deviceId) {
+                        return filled($d['jid'] ?? null);
+                    }
+                }
+                return false;
             } catch (Throwable $e) {
                 return false;
             }

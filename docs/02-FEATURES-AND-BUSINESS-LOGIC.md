@@ -118,7 +118,7 @@ UI (dropdown klien, dibangun JS dari `CLIENTS` = `{id, name, remaining, booked, 
 - Konfigurasi: `GOWA_BASE_URL`, `GOWA_USERNAME`, `GOWA_PASSWORD` (Basic Auth bila username terisi), opsional `GOWA_DEVICE_ID` → header `X-Device-Id` (GoWA multi-device).
 - **Badge status** (kanan atas): `WA Aktif` (`bg-success-subtle text-success`) / `WA Tidak Aktif` (`bg-danger-subtle text-danger`) / `Cek WA...` (abu, belum dicek).
   - `cachedStatus()`: dibaca dari cache saja (tanpa HTTP) → dipakai saat render halaman lewat View composer (`$waState`). Tidak dikonfigurasi → `false`.
-  - `checkStatus()`: `GET {base}/app/devices` (timeout 4 dtk), **di-cache 120 detik**; aktif bila respons sukses dan ada ≥1 perangkat. Dipanggil hanya dari endpoint `GET /wa-status`.
+  - `checkStatus()`: `GET {base}/app/devices` (timeout 4 dtk), **di-cache 120 detik**; aktif hanya bila device sendiri (`GOWA_DEVICE_ID`) ada di hasil DAN `jid`-nya terisi. Perhatian: instance GoWA di `wa.iconix.id` dipakai bersama banyak tenant, endpoint ini mengembalikan device semua tenant, jadi JANGAN menilai aktif dari jumlah hasil (bug lama: badge selalu hijau). `jid` kosong berarti device terdaftar tapi belum di-scan/link. Dipanggil hanya dari endpoint `GET /wa-status`.
   - Browser: `public/js/app.js` mengecek `/wa-status` saat badge berstatus `checking` dan polling tiap 60 dtk. Header bersifat `data-turbo-permanent` sehingga badge tidak dirender ulang tiap pindah menu.
 - **Kirim pesan** `sendMessage()`: `POST {base}/send/message` JSON `{phone: "62…@s.whatsapp.net", message}`; nomor dinormalisasi (`08…` → `628…`); semua error ditangkap → `false`.
 - **Format laporan** (`buildSessionReport()`), urutan:
