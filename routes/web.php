@@ -1,0 +1,46 @@
+<?php
+
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ClientController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EquipmentController;
+use App\Http\Controllers\PublicProgressController;
+use App\Http\Controllers\ScheduleController;
+use Illuminate\Support\Facades\Route;
+
+// Publik: kartu progres yang dibagikan ke klien (tanpa login)
+Route::get('/progress/{token}', [PublicProgressController::class, 'show'])->name('progress.show');
+
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    Route::get('/', [DashboardController::class, 'index'])->name('kalender');
+    Route::get('/kalender', [DashboardController::class, 'index']);
+    Route::get('/wa-status', [DashboardController::class, 'waStatus'])->name('wa.status');
+
+    Route::get('/klien', [ClientController::class, 'index'])->name('klien.index');
+    Route::post('/klien', [ClientController::class, 'store'])->name('klien.store');
+    Route::get('/klien/{client}/riwayat', [ClientController::class, 'history'])->name('klien.history');
+    Route::patch('/klien/{client}',[ClientController::class, 'update'])->name('klien.update');
+    Route::patch('/klien/{client}/berat', [ClientController::class, 'updateWeight'])->name('klien.weight');
+    Route::post('/klien/{client}/sesi', [ClientController::class, 'addSessions'])->name('klien.sessions');
+    Route::delete('/klien/{client}', [ClientController::class, 'destroy'])->name('klien.destroy');
+
+    Route::get('/alat', [EquipmentController::class, 'index'])->name('alat.index');
+    Route::post('/alat', [EquipmentController::class, 'store'])->name('alat.store');
+    Route::patch('/alat/{equipment}/toggle', [EquipmentController::class, 'toggle'])->name('alat.toggle');
+    Route::delete('/alat/{equipment}', [EquipmentController::class, 'destroy'])->name('alat.destroy');
+
+    Route::get('/jadwal', [ScheduleController::class, 'index'])->name('jadwal.index');
+    Route::get('/jadwal/berjalan', [ScheduleController::class, 'running'])->name('jadwal.running');
+    Route::post('/jadwal', [ScheduleController::class, 'store'])->name('jadwal.store');
+    Route::delete('/jadwal/{schedule}', [ScheduleController::class, 'destroy'])->name('jadwal.destroy');
+    Route::post('/jadwal/{schedule}/mulai', [ScheduleController::class, 'start'])->name('jadwal.start');
+    Route::post('/jadwal/{schedule}/batal-mulai', [ScheduleController::class, 'cancelStart'])->name('jadwal.cancelStart');
+    Route::post('/jadwal/{schedule}/selesai', [ScheduleController::class, 'finish'])->name('jadwal.finish');
+});
