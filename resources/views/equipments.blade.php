@@ -25,12 +25,10 @@
         @foreach($grouped[$cat] as $eq)
             <div class="agenda-item">
                 <div class="agenda-body">
-                    <div class="nm {{ $eq->is_available ? '' : 'text-decoration-line-through text-secondary' }}">{{ $eq->name }}</div>
-                    <div class="pg">{{ $eq->is_available ? 'Tersedia' : 'Sedang tidak tersedia' }}</div>
+                    <div class="nm {{ $eq->is_available ? '' : 'text-decoration-line-through text-secondary' }}" data-eq-name>{{ $eq->name }}</div>
+                    <div class="pg" data-eq-status>{{ $eq->is_available ? 'Tersedia' : 'Sedang tidak tersedia' }}</div>
                 </div>
-                <form method="POST" action="{{ route('alat.toggle', $eq) }}">@csrf @method('PATCH')
-                    <button class="btn btn-soft btn-sm" title="Ubah ketersediaan"><i class="bi {{ $eq->is_available ? 'bi-toggle-on' : 'bi-toggle-off' }}"></i></button>
-                </form>
+                <button type="button" class="btn btn-soft btn-sm" title="Ubah ketersediaan" data-toggle-btn data-url="{{ route('alat.toggle', $eq) }}"><i class="bi {{ $eq->is_available ? 'bi-toggle-on' : 'bi-toggle-off' }}" data-eq-icon></i></button>
                 <form method="POST" action="{{ route('alat.destroy', $eq) }}" data-confirm="{{ $eq->name }} akan dihapus dari daftar alat." data-confirm-title="Hapus alat ini?">@csrf @method('DELETE')
                     <button class="btn btn-sm btn-outline-danger rounded-3"><i class="bi bi-trash"></i></button>
                 </form>
@@ -47,13 +45,39 @@
 
 @push('scripts')
 <script>
-document.querySelectorAll('[data-chip-group]').forEach(g => {
-    g.addEventListener('click', e => {
-        const c = e.target.closest('.chip'); if (!c) return;
-        g.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-        c.classList.add('active');
-        g.querySelector('input[type=hidden]').value = c.dataset.value;
+(() => {
+    document.querySelectorAll('[data-chip-group]').forEach(g => {
+        g.addEventListener('click', e => {
+            const c = e.target.closest('.chip'); if (!c) return;
+            g.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+            g.querySelector('input[type=hidden]').value = c.dataset.value;
+        });
     });
-});
+
+    // Toggle ketersediaan alat via AJAX: halaman tidak reload, scroll tetap di tempat.
+    document.querySelectorAll('[data-toggle-btn]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const item = btn.closest('.agenda-item');
+            const nameEl = item.querySelector('[data-eq-name]');
+            const statusEl = item.querySelector('[data-eq-status]');
+            const iconEl = btn.querySelector('[data-eq-icon]');
+            btn.disabled = true;
+            try {
+                const data = await api(btn.dataset.url, 'PATCH');
+                const on = !!data.is_available;
+                nameEl.classList.toggle('text-decoration-line-through', !on);
+                nameEl.classList.toggle('text-secondary', !on);
+                statusEl.textContent = on ? 'Tersedia' : 'Sedang tidak tersedia';
+                iconEl.className = 'bi ' + (on ? 'bi-toggle-on' : 'bi-toggle-off');
+                if (data.message) toast(data.message);
+            } catch (err) {
+                toast(err.message || 'Terjadi kendala, coba lagi ya.', 'danger');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    });
+})();
 </script>
 @endpush

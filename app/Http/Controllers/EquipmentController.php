@@ -29,9 +29,21 @@ class EquipmentController extends Controller
         return back()->with('success', 'Alat berhasil ditambahkan ✨');
     }
 
-    public function toggle(Equipment $equipment)
+    public function toggle(Request $request, Equipment $equipment)
     {
         $equipment->update(['is_available' => ! $equipment->is_available]);
+
+        // AJAX (dari halaman Alat Gym): balas JSON agar halaman tidak reload
+        // dan posisi scroll tetap di tempat.
+        if ($request->expectsJson()) {
+            return response()->json([
+                'is_available' => $equipment->is_available,
+                'message' => $equipment->is_available
+                    ? $equipment->name . ' sekarang tersedia ✨'
+                    : $equipment->name . ' dinonaktifkan sementara.',
+            ]);
+        }
+
         return back();
     }
 
