@@ -21,8 +21,17 @@
     <button class="btn btn-pink w-100"><i class="bi bi-plus-lg"></i> Tambah Alat</button>
 </form>
 
+@if($grouped->isNotEmpty())
+    <div class="input-group mb-2">
+        <span class="input-group-text" style="background:#fff"><i class="bi bi-search"></i></span>
+        <input type="text" id="eqSearch" class="form-control" placeholder="Cari alat… misalnya: dumbbell" autocomplete="off">
+    </div>
+    <div id="eqSearchEmpty" class="text-center text-secondary py-4 d-none">Tidak ada alat yang cocok dengan pencarian "<b id="eqSearchTerm"></b>". Coba kata kunci lain ya.</div>
+@endif
+
 @forelse($categories as $cat)
     @if(isset($grouped[$cat]))
+        <div data-eq-group data-category="{{ $cat }}">
         <h6 class="fw-bold text-uppercase small mt-3" style="color:var(--muted)">{{ $cat }}</h6>
         @foreach($grouped[$cat] as $eq)
             <div class="agenda-item">
@@ -47,6 +56,7 @@
                 </form>
             </div>
         @endforeach
+        </div>
     @endif
 @empty
 @endforelse
@@ -121,6 +131,28 @@
                 btn.disabled = false;
             }
         });
+    });
+
+    // Cari alat: saring daftar langsung saat mengetik, tanpa reload.
+    // Cocokkan nama alat ATAU nama kategorinya; grup kategori yang kosong ikut disembunyikan.
+    const eqSearch = document.getElementById('eqSearch');
+    if (eqSearch) eqSearch.addEventListener('input', () => {
+        const q = eqSearch.value.trim().toLowerCase();
+        let visible = 0;
+        document.querySelectorAll('[data-eq-group]').forEach(g => {
+            const catMatch = !q || (g.dataset.category || '').toLowerCase().includes(q);
+            let groupVisible = 0;
+            g.querySelectorAll('.agenda-item').forEach(row => {
+                const nameEl = row.querySelector('[data-eq-name]');
+                const show = catMatch || !q || (nameEl ? nameEl.textContent.toLowerCase().includes(q) : false);
+                row.style.display = show ? '' : 'none';
+                if (show) groupVisible++;
+            });
+            g.style.display = groupVisible ? '' : 'none';
+            visible += groupVisible;
+        });
+        document.getElementById('eqSearchTerm').textContent = eqSearch.value.trim();
+        document.getElementById('eqSearchEmpty').classList.toggle('d-none', visible > 0);
     });
 })();
 </script>
