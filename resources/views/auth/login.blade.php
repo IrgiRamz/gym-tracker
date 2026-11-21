@@ -31,9 +31,9 @@
         <form method="POST" action="{{ route('login.attempt') }}" data-turbo="false">
             @csrf
             <div class="mb-3">
-                <label class="form-label" for="email">Email</label>
-                <input type="email" id="email" name="email" value="{{ old('email') }}" class="form-control @error('email') is-invalid @enderror" placeholder="nama@email.com" autofocus required>
-                @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                <label class="form-label" for="login">Email atau Nama</label>
+                <input type="text" id="login" name="login" value="{{ old('login') }}" class="form-control @error('login') is-invalid @enderror" placeholder="Nama atau nama@email.com" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" autofocus required>
+                @error('login')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="mb-4">
                 <label class="form-label" for="password">Password</label>

@@ -23,7 +23,7 @@ Menghapus klien menghapus semua program, jadwal, dan log berat badannya (cascade
 
 ### `users` (bawaan Laravel)
 `id, name, email (unique), email_verified_at, password (hashed), remember_token, timestamps`.
-Tabel pendamping: `password_reset_tokens`, **`sessions`** (dipakai `SESSION_DRIVER=database`). Akun PT default dibuat di `DatabaseSeeder` (lihat file seeder untuk kredensial; **jangan menaruh email/password asli di dokumentasi**). Login memakai **Email + Password** (tidak ada kolom username).
+Tabel pendamping: `password_reset_tokens`, **`sessions`** (dipakai `SESSION_DRIVER=database`). Akun PT default dibuat di `DatabaseSeeder` (lihat file seeder untuk kredensial; **jangan menaruh email/password asli di dokumentasi**). Login memakai **Email atau Nama (`users.name`) + Password** — tidak ada kolom username; `name` tidak unik (lihat `02` §1).
 
 ### `equipments`
 | Kolom | Tipe | Catatan |
@@ -137,4 +137,4 @@ Casting model `Schedule`: `scheduled_date` → `date:Y-m-d`, `started_at`/`finis
 
 ## Seeder (`DatabaseSeeder`)
 
-Membuat: 1 akun PT; 6 alat (Dumbbell 1–25 kg, Barbell & Plate, Mesin Leg Press, Lat Pulldown & Seated Row, Treadmill, Matras Yoga); 3 klien wanita contoh (Aulia Rahma, Sinta Maharani, Dewi Anggraini) lengkap dengan `body_focus` array, rentang protein, dan program dari `AiWorkoutService::fallback()`; beberapa jadwal di sekitar hari ini (sebagian `completed` dengan `share_token`). `php artisan migrate:fresh --seed` mereset semuanya.
+Membuat: 1 akun PT; **31 alat gym komersial** (tanpa alat home workout seperti matras/resistance band) — *Beban Bebas* (8): Dumbbell 1–25 kg, Dumbbell Berat 26–40 kg, Barbell & Plate, EZ Bar, Kettlebell, Flat Bench, Adjustable Incline Bench, Squat/Power Rack; *Mesin Latihan* (17): Leg Press, Lat Pulldown & Seated Row, Smith Machine, Cable Crossover, Chest Press, Pec Deck, Shoulder Press, Leg Extension, Leg Curl, Hack Squat, Hip Abduction/Adduction, Glute Kickback, Hip Thrust, Seated Calf Raise, Back Extension Bench, Assisted Pull-Up/Dip, Ab Crunch; *Kardio* (6, kategori `Kardio & Matras`): Treadmill, Elliptical, Stationary Bike, Spin Bike, Stair Climber, Rowing Machine. Seeder memakai `firstOrCreate` per nama, jadi menjalankan `db:seed` pada database yang sudah ada **menambah** alat baru tetapi **tidak menghapus** alat lama (mis. "Matras Yoga" harus dihapus manual lewat menu Alat Gym atau pakai `migrate:fresh --seed`). Urutan daftar penting untuk pencocokan kata kunci template AI. 3 klien wanita contoh (Aulia Rahma, Sinta Maharani, Dewi Anggraini) lengkap dengan `body_focus` array, rentang protein, dan program dari `AiWorkoutService::fallback()`; beberapa jadwal di sekitar hari ini (sebagian `completed` dengan `share_token`). `php artisan migrate:fresh --seed` mereset semuanya.

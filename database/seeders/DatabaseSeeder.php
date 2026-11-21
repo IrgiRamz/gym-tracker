@@ -20,13 +20,43 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('Nailsayang123.'),
         ]);
 
+        // Alat gym komersial pada umumnya (tanpa alat home workout seperti matras/resistance band).
+        // Urutan penting: pencocokan kata kunci di template cadangan memakai alat pertama yang cocok.
         $equipments = [
+            // Beban Bebas
             ['Dumbbell (1 - 25 kg)', 'Beban Bebas'],
+            ['Dumbbell Berat (26 - 40 kg)', 'Beban Bebas'],
             ['Barbell & Plate', 'Beban Bebas'],
+            ['EZ Bar (Curl Bar)', 'Beban Bebas'],
+            ['Kettlebell (4 - 24 kg)', 'Beban Bebas'],
+            ['Flat Bench (Bangku Datar)', 'Beban Bebas'],
+            ['Adjustable Incline Bench', 'Beban Bebas'],
+            ['Squat Rack / Power Rack', 'Beban Bebas'],
+            // Mesin Latihan
             ['Mesin Leg Press', 'Mesin Latihan'],
             ['Lat Pulldown & Seated Row', 'Mesin Latihan'],
+            ['Smith Machine', 'Mesin Latihan'],
+            ['Cable Crossover (Dual Cable)', 'Mesin Latihan'],
+            ['Chest Press Machine', 'Mesin Latihan'],
+            ['Pec Deck / Butterfly Machine', 'Mesin Latihan'],
+            ['Shoulder Press Machine', 'Mesin Latihan'],
+            ['Leg Extension Machine', 'Mesin Latihan'],
+            ['Leg Curl Machine', 'Mesin Latihan'],
+            ['Hack Squat Machine', 'Mesin Latihan'],
+            ['Hip Abduction / Adduction Machine', 'Mesin Latihan'],
+            ['Glute Kickback Machine', 'Mesin Latihan'],
+            ['Hip Thrust Machine', 'Mesin Latihan'],
+            ['Seated Calf Raise Machine', 'Mesin Latihan'],
+            ['Back Extension Bench (Hyperextension)', 'Mesin Latihan'],
+            ['Assisted Pull-Up / Dip Machine', 'Mesin Latihan'],
+            ['Ab Crunch Machine', 'Mesin Latihan'],
+            // Kardio
             ['Treadmill', 'Kardio & Matras'],
-            ['Matras Yoga', 'Kardio & Matras'],
+            ['Elliptical (Cross Trainer)', 'Kardio & Matras'],
+            ['Stationary Bike (Upright Bike)', 'Kardio & Matras'],
+            ['Spin Bike', 'Kardio & Matras'],
+            ['Stair Climber', 'Kardio & Matras'],
+            ['Rowing Machine', 'Kardio & Matras'],
         ];
         foreach ($equipments as [$name, $cat]) {
             Equipment::firstOrCreate(['name' => $name], ['category' => $cat, 'is_available' => true]);

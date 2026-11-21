@@ -124,17 +124,21 @@ class AiWorkoutService
         $wanita = ($client['gender'] ?? '') === 'Wanita';
         $base = $wanita ? 0.6 : 1.0; // pengali beban awal
 
-        $find = function (string $kw) use ($equipments) {
-            foreach ($equipments as $n) {
-                if (stripos($n, $kw) !== false) {
-                    return $n;
+        // Cari alat pertama yang namanya memuat kata kunci. $kw bisa daftar kata kunci (dicoba berurutan).
+        $find = function (string|array $kw) use ($equipments) {
+            foreach ((array) $kw as $k) {
+                foreach ($equipments as $n) {
+                    if (stripos($n, $k) !== false) {
+                        return $n;
+                    }
                 }
             }
             return null;
         };
 
         // Bangun satu gerakan. Jika alat tidak ada, pakai gerakan bodyweight pengganti ($alt) atau lewati.
-        $ex = function (string $name, ?string $kw, string $sets, float $target, string $tip, ?string $alt = null) use ($find, $base) {
+        // $kw null = gerakan bodyweight (tanpa alat).
+        $ex = function (string $name, string|array|null $kw, string $sets, float $target, string $tip, ?string $alt = null) use ($find, $base) {
             $eq = $kw ? $find($kw) : null;
             if ($kw && ! $eq) {
                 if (! $alt) {
@@ -149,55 +153,92 @@ class AiWorkoutService
         };
 
         $lib = [
+            // Urutan = prioritas. Gerakan tanpa alat (kw null) adalah bodyweight di area gym.
             'Bokong (Glutes)' => [
-                $ex('Hip Thrust', 'barbell', '3 x 12', 20, 'Remas bokong di puncak gerakan.', 'Glute Bridge'),
+                $ex('Hip Thrust', ['hip thrust', 'barbell'], '3 x 12', 20, 'Remas bokong di puncak gerakan.', 'Glute Bridge'),
                 $ex('Romanian Deadlift', 'dumbbell', '3 x 12', 6, 'Punggung lurus, dorong pinggul ke belakang.', 'Good Morning Bodyweight'),
-                $ex('Glute Bridge', 'matras', '3 x 15', 0, 'Tahan 2 detik di atas.'),
-                $ex('Donkey Kick', 'matras', '3 x 15 /kaki', 0, 'Jaga pinggul tetap rata.'),
+                $ex('Glute Kickback Machine', 'glute kickback', '3 x 12 /kaki', 10, 'Dorong dengan tumit, jangan melengkungkan punggung.', 'Donkey Kick'),
+                $ex('Hip Abduction Machine', 'hip abduction', '3 x 15', 20, 'Buka perlahan, tahan sebentar di ujung gerakan.'),
+                $ex('Glute Bridge', null, '3 x 15', 0, 'Tahan 2 detik di atas.'),
+                $ex('Donkey Kick', null, '3 x 15 /kaki', 0, 'Jaga pinggul tetap rata.'),
             ],
             'Kaki & Paha' => [
                 $ex('Goblet Squat', 'dumbbell', '3 x 12', 6, 'Punggung tegak, lutut searah jari kaki.', 'Bodyweight Squat'),
                 $ex('Leg Press', 'leg press', '3 x 12', 30, 'Jangan kunci lutut di ujung gerakan.', 'Wall Sit'),
+                $ex('Leg Extension', 'leg extension', '3 x 12', 15, 'Tahan 1 detik di atas, turun perlahan.'),
+                $ex('Leg Curl', 'leg curl', '3 x 12', 15, 'Tarik tumit ke arah bokong, gerakan terkontrol.'),
                 $ex('Walking Lunges', 'dumbbell', '2 x 10 /kaki', 4, 'Langkah cukup lebar, lutut stabil.', 'Lunges Bodyweight'),
-                $ex('Calf Raise', null, '3 x 15', 0, 'Naik perlahan, turun terkontrol.'),
+                $ex('Hack Squat', 'hack squat', '3 x 10', 20, 'Punggung menempel sandaran, turun sampai nyaman.'),
+                $ex('Smith Machine Squat', 'smith', '3 x 10', 15, 'Kaki sedikit di depan, dada tegak.'),
+                $ex('Calf Raise', ['calf raise'], '3 x 15', 20, 'Naik perlahan, turun terkontrol.', 'Calf Raise Bodyweight'),
             ],
             'Dada (Chest)' => [
-                $ex('Chest Press Machine', 'chest', '3 x 12', 15, 'Hembuskan napas saat mendorong, bahu turun.', 'Push Up Lutut'),
-                $ex('Dumbbell Floor Press', 'dumbbell', '3 x 12', 5, 'Siku sekitar 45 derajat dari badan.', 'Push Up Lutut'),
-                $ex('Dumbbell Fly', 'dumbbell', '3 x 12', 3, 'Siku sedikit ditekuk, buka dada perlahan.', 'Wide Push Up Lutut'),
+                $ex('Chest Press Machine', 'chest press', '3 x 12', 15, 'Hembuskan napas saat mendorong, bahu turun.', 'Push Up Lutut'),
+                $ex('Dumbbell Bench Press', 'bench', '3 x 12', 5, 'Siku sekitar 45 derajat dari badan.', 'Push Up Lutut'),
+                $ex('Pec Deck', 'pec deck', '3 x 12', 15, 'Peras dada di tengah, jangan angkat bahu.'),
+                $ex('Incline Dumbbell Press', 'incline', '3 x 10', 5, 'Dorong ke atas dada, siku tidak terlalu lebar.'),
+                $ex('Cable Fly', 'cable', '3 x 12', 5, 'Siku sedikit ditekuk, peluk ke depan dada.'),
                 $ex('Push Up', null, '3 x 8', 0, 'Badan lurus, boleh di lutut dulu.'),
             ],
             'Punggung (Back)' => [
-                $ex('Lat Pulldown', 'lat', '3 x 12', 20, 'Tarik siku ke arah pinggang.', 'Superman Hold'),
-                $ex('Seated Row', 'row', '3 x 12', 15, 'Dada terbuka, bahu turun.', 'Reverse Snow Angel'),
+                $ex('Lat Pulldown', 'lat pulldown', '3 x 12', 20, 'Tarik siku ke arah pinggang.', 'Superman Hold'),
+                $ex('Seated Row', 'seated row', '3 x 12', 15, 'Dada terbuka, bahu turun.', 'Reverse Snow Angel'),
                 $ex('Dumbbell Row', 'dumbbell', '3 x 12', 5, 'Punggung rata, tarik dengan siku.', 'Superman'),
-                $ex('Superman', 'matras', '3 x 12', 0, 'Angkat dada dan kaki pelan-pelan.'),
+                $ex('Assisted Pull-Up', 'assisted', '3 x 8', 20, 'Tarik dagu melewati bar, turun perlahan.'),
+                $ex('Back Extension', 'back extension', '3 x 12', 0, 'Naik sampai badan lurus, jangan berlebihan melengkung.', 'Superman'),
+                $ex('Superman', null, '3 x 12', 0, 'Angkat dada dan kaki pelan-pelan.'),
             ],
             'Lengan & Bahu' => [
                 $ex('Dumbbell Shoulder Press', 'dumbbell', '3 x 12', 4, 'Jaga perut tetap kencang.', 'Pike Push Up'),
                 $ex('Lateral Raise', 'dumbbell', '3 x 12', 2, 'Siku sedikit ditekuk, jangan diayun.'),
-                $ex('Bicep Curl', 'dumbbell', '3 x 12', 3, 'Siku tetap dekat badan.'),
+                $ex('Bicep Curl', ['dumbbell', 'ez bar'], '3 x 12', 3, 'Siku tetap dekat badan.'),
+                $ex('Triceps Pushdown', 'cable', '3 x 12', 10, 'Siku menempel badan, tekan sampai lurus.'),
+                $ex('Shoulder Press Machine', 'shoulder press', '3 x 12', 10, 'Jangan kunci siku di atas.'),
                 $ex('Triceps Extension', 'dumbbell', '3 x 12', 3, 'Siku menghadap ke depan.', 'Triceps Dip Kursi'),
             ],
             'Perut & Pinggang' => [
-                $ex('Plank', 'matras', '3 x 30 detik', 0, 'Perut kencang, badan lurus.'),
-                $ex('Russian Twist', 'matras', '3 x 20', 0, 'Putar dari pinggang, bukan lengan.'),
-                $ex('Dead Bug', 'matras', '3 x 10', 0, 'Pinggang menempel lantai.'),
-                $ex('Bicycle Crunch', 'matras', '3 x 20', 0, 'Pelan dan terkontrol.'),
+                $ex('Plank', null, '3 x 30 detik', 0, 'Perut kencang, badan lurus.'),
+                $ex('Cable Crunch', 'cable', '3 x 15', 10, 'Tekuk dari perut, bukan dari tarikan lengan.'),
+                $ex('Russian Twist', null, '3 x 20', 0, 'Putar dari pinggang, bukan lengan.'),
+                $ex('Ab Crunch Machine', 'ab crunch', '3 x 15', 15, 'Hembuskan napas saat menekuk badan.'),
+                $ex('Dead Bug', null, '3 x 10', 0, 'Pinggang menempel lantai.'),
+                $ex('Bicycle Crunch', null, '3 x 20', 0, 'Pelan dan terkontrol.'),
             ],
             'Seluruh Tubuh' => [
                 $ex('Squat', 'dumbbell', '3 x 12', 6, 'Turun sampai paha sejajar lantai.', 'Bodyweight Squat'),
-                $ex('Chest Press', 'chest', '3 x 12', 15, 'Hembuskan napas saat mendorong.', 'Push Up Lutut'),
-                $ex('Seated Row', 'row', '3 x 12', 15, 'Dada terbuka, bahu turun.', 'Superman'),
+                $ex('Chest Press', 'chest press', '3 x 12', 15, 'Hembuskan napas saat mendorong.', 'Push Up Lutut'),
+                $ex('Seated Row', 'seated row', '3 x 12', 15, 'Dada terbuka, bahu turun.', 'Superman'),
                 $ex('Lunges', 'dumbbell', '2 x 10 /kaki', 4, 'Lutut tidak melewati ujung kaki.', 'Lunges Bodyweight'),
-                $ex('Dead Bug', 'matras', '3 x 10', 0, 'Pinggang menempel lantai.'),
+                $ex('Plank', null, '3 x 30 detik', 0, 'Perut kencang, badan lurus.'),
+                $ex('Dead Bug', null, '3 x 10', 0, 'Pinggang menempel lantai.'),
             ],
         ];
-        $lib = array_map(fn ($list) => array_values(array_filter($list)), $lib);
+        // Buang gerakan yang dilewati (alat tidak ada) dan gerakan kembar (mis. pengganti bodyweight yang sama)
+        $lib = array_map(function ($list) {
+            $seen = [];
+            $out = [];
+            foreach (array_filter($list) as $e) {
+                if (! isset($seen[$e['name']])) {
+                    $seen[$e['name']] = true;
+                    $out[] = $e;
+                }
+            }
+            return $out;
+        }, $lib);
 
-        $warmup = fn () => $find('treadmill')
-            ? $ex('Jalan Cepat / Pemanasan', 'treadmill', '1 x 5 menit', 0, 'Pemanasan santai sampai badan hangat.')
-            : $ex('Pemanasan Dinamis', null, '2 x 10', 0, 'Putar bahu, pinggul, dan lutut pelan-pelan.');
+        // Pemanasan kardio: treadmill, lalu sepeda, lalu elliptical; jika tidak ada pemanasan dinamis
+        $warmup = function () use ($find, $ex) {
+            if ($find('treadmill')) {
+                return $ex('Jalan Cepat / Pemanasan', 'treadmill', '1 x 5 menit', 0, 'Pemanasan santai sampai badan hangat.');
+            }
+            if ($find('bike')) {
+                return $ex('Sepeda Statis / Pemanasan', 'bike', '1 x 5 menit', 0, 'Kayuh santai sampai badan hangat.');
+            }
+            if ($find('elliptical')) {
+                return $ex('Elliptical / Pemanasan', 'elliptical', '1 x 5 menit', 0, 'Gerak santai sampai badan hangat.');
+            }
+            return $ex('Pemanasan Dinamis', null, '2 x 10', 0, 'Putar bahu, pinggul, dan lutut pelan-pelan.');
+        };
 
         // Bagi area fokus ke tiap sesi secara bergiliran
         $n = count($focus);

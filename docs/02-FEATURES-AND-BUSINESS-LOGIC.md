@@ -32,15 +32,16 @@ Halaman Blade (form biasa) memakai redirect + flash `success`; endpoint JSON (`/
 
 ## 1. Autentikasi
 
-- `/login` (`resources/views/auth/login.blade.php`): form Email + Password, tombol "Masuk ✨", desain pastel pink; pesan error Bahasa Indonesia.
-- `Auth::attempt($credentials, true)` → **remember = true default**; sesi 1 tahun (`SESSION_LIFETIME=525600`). Berhasil → `redirect()->intended('/')`.
+- `/login` (`resources/views/auth/login.blade.php`): satu kolom **"Email atau Nama"** (`name="login"`) + Password, tombol "Masuk ✨", desain pastel pink; pesan error Bahasa Indonesia.
+- **Login dengan email ATAU nama** (`AuthController@login`): bila isian berformat email → `Auth::attempt(['email'=>…])`; selain itu dicari akun dengan `users.name` yang sama (MySQL tidak membedakan huruf besar/kecil) dan dicoba lewat emailnya. Nama tidak unik, jadi bila ada beberapa akun bernama sama, semuanya dicoba satu per satu sampai password cocok. Gagal → "Email/nama atau password belum cocok. Coba cek lagi ya 💕" (error key `login`).
+- `Auth::attempt(..., true)` → **remember = true default**; sesi 1 tahun (`SESSION_LIFETIME=525600`). Berhasil → `redirect()->intended('/')`.
 - Sudah login lalu membuka `/login` → middleware `guest` mengarahkan ke `/`. Belum login mengakses halaman lain → redirect ke `/login`.
 - Halaman login **selalu load penuh** (bukan Turbo): `<meta name="turbo-visit-control" content="reload">` + `data-turbo="false"` pada form, supaya token CSRF dan sesi baru terbaca bersih.
 
 ## 2. Master Alat Gym (`/alat`, `EquipmentController`)
 
 - Tambah alat (nama + kategori via chips: Beban Bebas, Mesin Latihan, Kardio & Matras, Tanpa Alat); **toggle** ketersediaan (`is_available`); hapus (modal konfirmasi lewat `data-confirm`).
-- **Integrasi AI**: `AiWorkoutService::generate()` mengambil `Equipment::where('is_available', true)->pluck('name')` dan memasukkannya ke *system prompt* Gemini ("WAJIB hanya memakai alat dari daftar berikut atau 'Tanpa Alat'"). Template cadangan juga hanya memakai alat yang tersedia (pencocokan kata kunci nama alat).
+- **Integrasi AI**: `AiWorkoutService::generate()` mengambil `Equipment::where('is_available', true)->pluck('name')` dan memasukkannya ke *system prompt* Gemini ("WAJIB hanya memakai alat dari daftar berikut atau 'Tanpa Alat'"). Template cadangan juga hanya memakai alat yang tersedia (pencocokan kata kunci nama alat: `find()` memakai alat **pertama** yang namanya memuat kata kunci, bisa daftar kata kunci berurutan). Gunakan kata kunci yang spesifik (mis. `'lat pulldown'`, bukan `'lat'` yang ikut cocok dengan "Barbell & **Plate**"). Gerakan bodyweight memakai `kw = null` (alat "Tanpa Alat"); alat yang tidak ada → gerakan pengganti bodyweight atau dilewati.
 
 ## 3. Manajemen Klien (`/klien`, `ClientController`, `clients.blade.php`)
 
