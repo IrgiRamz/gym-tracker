@@ -40,10 +40,11 @@ return [
 
         'public' => [
             'driver' => 'local',
-            // Sengaja folder ASLI public/storage, BUKAN storage/app/public + symlink:
-            // FrankenPHP tidak melayani file di balik symlink folder (404), jadi tanpa storage:link.
-            'root' => public_path('storage'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            // Sengaja folder asli public/uploads dengan awalan URL /uploads:
+            // awalan /storage/* diblokir 404 oleh snippet keamanan Caddyfile bersama di VPS ini,
+            // dan FrankenPHP juga tidak melayani file di balik symlink folder (storage:link).
+            'root' => public_path('uploads'),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/uploads',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
