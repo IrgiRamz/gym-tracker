@@ -40,7 +40,9 @@ return [
 
         'public' => [
             'driver' => 'local',
-            'root' => storage_path('app/public'),
+            // Sengaja folder ASLI public/storage, BUKAN storage/app/public + symlink:
+            // FrankenPHP tidak melayani file di balik symlink folder (404), jadi tanpa storage:link.
+            'root' => public_path('storage'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
             'throw' => false,
