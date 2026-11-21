@@ -83,7 +83,7 @@ app/
     GowaWhatsappService.php       status GoWA, kirim pesan, susun laporan
   Providers/AppServiceProvider.php   View composer: kirim $waState ke layouts.app
 database/migrations/  (lihat 01-DATABASE-AND-MODELS.md)
-database/seeders/DatabaseSeeder.php  akun PT, 6 alat, 3 klien contoh + program + jadwal
+database/seeders/DatabaseSeeder.php  akun PT, 31 alat, 3 klien contoh + program + jadwal
 resources/views/
   layouts/app.blade.php   layout utama (head PWA+Turbo, header & bottom nav permanen, modal konfirmasi)
   calendar.blade.php  clients.blade.php  equipments.blade.php
