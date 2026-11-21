@@ -20,6 +20,7 @@ class ClientController extends Controller
             'focuses' => Client::FOCUSES,
             'activities' => array_keys(Client::ACTIVITIES),
             'equipmentCount' => Equipment::where('is_available', true)->count(),
+            'equipmentImages' => Equipment::imageMap(),
         ]);
     }
 

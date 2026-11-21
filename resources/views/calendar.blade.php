@@ -75,12 +75,24 @@
         </div>
     </div>
 </div>
+
+{{-- Lihat foto alat (dari live session) --}}
+<div class="modal fade" id="equipmentImageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="equipmentImageTitle">Foto Alat</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body text-center"><img id="equipmentImageImg" class="img-fluid rounded-4" alt="Foto alat gym"></div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
 (function () {
     const CLIENTS = @json($clients);
+    // Peta nama alat => URL foto alat (hanya alat yang punya foto).
+    const EQUIPMENT_IMAGES = @json($equipmentImages ?? []);
     const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const DAYS = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
     const pad = n => String(n).padStart(2, '0');
@@ -229,7 +241,8 @@
         document.getElementById('liveProgram').textContent = s.program_label || 'Latihan bebas';
         document.getElementById('liveNote').value = '';
         document.getElementById('liveExercises').innerHTML = (s.exercises.length ? s.exercises : []).map((x, i) => `
-            <div class="ex-row" data-i="${i}" data-name="${esc(x.name)}" data-equipment="${esc(x.equipment)}" data-sets-reps="${esc(x.sets_reps)}">
+            <div class="ex-row position-relative" data-i="${i}" data-name="${esc(x.name)}" data-equipment="${esc(x.equipment)}" data-sets-reps="${esc(x.sets_reps)}">
+                ${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm position-absolute top-0 end-0 m-2" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}
                 <div class="fw-bold">${esc(x.name)}</div>
                 <div class="small text-secondary mb-2">Target ${esc(x.sets_reps)}${x.target_kg > 0 ? ' &middot; ' + esc(x.target_kg) + ' kg' : ''} &middot; ${esc(x.equipment)}</div>
                 <div class="live-inputs">
@@ -255,6 +268,15 @@
         showBanner();
     }
     function closeLive() { panel.classList.remove('show'); document.body.style.overflow = ''; }
+
+    // Ikon mata di pojok kotak gerakan: lihat foto alat (hanya muncul bila alatnya punya foto).
+    document.getElementById('liveExercises').addEventListener('click', e => {
+        const b = e.target.closest('[data-eq-photo]'); if (!b) return;
+        const url = EQUIPMENT_IMAGES[b.dataset.eqPhoto]; if (!url) return;
+        document.getElementById('equipmentImageTitle').textContent = 'Foto ' + b.dataset.eqPhoto;
+        document.getElementById('equipmentImageImg').src = url;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('equipmentImageModal')).show();
+    });
     function showBanner() {
         const b = document.getElementById('runningBanner');
         b.classList.toggle('d-none', !live);

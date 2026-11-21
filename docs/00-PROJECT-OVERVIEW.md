@@ -1,6 +1,6 @@
 # 00 — Project Overview: Gym Tracker by Neil
 
-> Terakhir diperbarui: 2026-11-21 (login email/nama, seeder 31 alat gym, aturan sisa sesi, toggle alat via AJAX tanpa reload, tombol reset semua alat). Folder `docs/` adalah **cetak biru proyek**. Baca semua file di folder ini (00 → 03) sebelum mengubah kode.
+> Terakhir diperbarui: 2026-11-21 (login email/nama, seeder 31 alat gym, aturan sisa sesi, toggle alat via AJAX tanpa reload, tombol reset semua alat, foto alat opsional + ikon mata di Lihat Program & live session). Folder `docs/` adalah **cetak biru proyek**. Baca semua file di folder ini (00 → 03) sebelum mengubah kode.
 > Dokumen ini ditulis dari kode aktual. Jika kode dan dokumen berbeda, **kode yang benar** — lalu perbaiki dokumennya.
 
 ## Daftar dokumen

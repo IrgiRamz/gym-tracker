@@ -32,6 +32,7 @@ Tabel pendamping: `password_reset_tokens`, **`sessions`** (dipakai `SESSION_DRIV
 | name | string | mis. "Dumbbell (1 - 25 kg)" |
 | category | string | salah satu `Equipment::CATEGORIES`: `Beban Bebas`, `Mesin Latihan`, `Kardio & Matras`, `Tanpa Alat` |
 | is_available | boolean default `true` | hanya alat `true` yang dikirim ke AI |
+| image_path | string nullable | path foto alat di disk `public` (folder `equipments`), diunggah opsional dari halaman Alat Gym; `null` = tidak ada foto. Dihapus dari disk saat foto diganti/dihapus, alat dihapus, atau reset semua alat |
 | timestamps | | |
 
 Model `Equipment` memakai `protected $table = 'equipments'`.

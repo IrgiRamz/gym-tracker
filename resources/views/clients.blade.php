@@ -228,6 +228,16 @@
     </div>
 </div>
 
+{{-- Lihat foto alat (dari modal program) --}}
+<div class="modal fade" id="equipmentImageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="equipmentImageTitle">Foto Alat</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body text-center"><img id="equipmentImageImg" class="img-fluid rounded-4" alt="Foto alat gym"></div>
+        </div>
+    </div>
+</div>
+
 {{-- History sesi & progres klien --}}
 <div class="modal fade" id="historyModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down" style="max-width:540px">
@@ -271,6 +281,9 @@
 @push('scripts')
 <script>
 (function () {
+    // Peta nama alat => URL foto alat (hanya alat yang punya foto).
+    const EQUIPMENT_IMAGES = @json($equipmentImages ?? []);
+
     // --- Choice chips ---
     document.querySelectorAll('[data-chip-group]').forEach(g => g.addEventListener('click', e => {
         const c = e.target.closest('.chip'); if (!c) return;
@@ -455,9 +468,18 @@
         const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
         document.getElementById('programBody').innerHTML = d.programs.map(p => `
             <div class="mb-3"><div class="fw-bold mb-2" style="color:var(--pink-dark)">${esc(p.day_label)}</div>
-            ${p.exercises_json.map(x => `<div class="ex-row"><div class="fw-bold">${esc(x.name)}</div>
+            ${p.exercises_json.map(x => `<div class="ex-row">${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm float-end" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}<div class="fw-bold">${esc(x.name)}</div>
                 <div class="small">${esc(x.sets_reps)} &middot; ${x.target_kg > 0 ? esc(x.target_kg) + ' kg' : 'berat badan'} &middot; <span class="text-secondary">${esc(x.equipment)}</span></div>
                 <div class="tip">💡 ${esc(x.tip)}</div></div>`).join('')}</div>`).join('') || '<div class="text-secondary">Belum ada program.</div>';
+    });
+
+    // --- Lihat foto alat dari modal program (ikon mata; hanya muncul bila alatnya punya foto) ---
+    document.getElementById('programBody').addEventListener('click', e => {
+        const b = e.target.closest('[data-eq-photo]'); if (!b) return;
+        const url = EQUIPMENT_IMAGES[b.dataset.eqPhoto]; if (!url) return;
+        document.getElementById('equipmentImageTitle').textContent = 'Foto ' + b.dataset.eqPhoto;
+        document.getElementById('equipmentImageImg').src = url;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('equipmentImageModal')).show();
     });
 
     // --- Modal berat badan ---

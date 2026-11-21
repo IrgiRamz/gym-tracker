@@ -34,6 +34,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/alat', [EquipmentController::class, 'index'])->name('alat.index');
     Route::post('/alat', [EquipmentController::class, 'store'])->name('alat.store');
     Route::patch('/alat/{equipment}/toggle', [EquipmentController::class, 'toggle'])->name('alat.toggle');
+    Route::patch('/alat/{equipment}/foto', [EquipmentController::class, 'updatePhoto'])->name('alat.foto');
+    Route::delete('/alat/{equipment}/foto', [EquipmentController::class, 'destroyPhoto'])->name('alat.foto.hapus');
     Route::delete('/alat/{equipment}', [EquipmentController::class, 'destroy'])->name('alat.destroy');
     Route::delete('/alat-reset', [EquipmentController::class, 'reset'])->name('alat.reset');
 
