@@ -98,9 +98,17 @@ class Schedule extends Model
         $equipment = ($equipment === '' || $equipment === 'Tanpa Alat') ? null : $equipment;
         $name = (string) ($p['name'] ?? 'Gerakan');
 
-        // Label ringkas per set, contoh: "S1 12x5kg · S2 10x7.5kg · S3 8x10kg"
+        // Label ringkas per set, contoh: "S1 12x5kg · S2 10x7.5kg · S3 8x10kg".
+        // Hanya tampil bila minimal satu set benar-benar terisi; semua set kosong -> null (hindari "S1 -").
         $detailLabel = null;
-        if ($detail) {
+        $anyDetailData = false;
+        foreach ($detail as $sd) {
+            if ($sd['reps'] !== null || $sd['kg'] > 0) {
+                $anyDetailData = true;
+                break;
+            }
+        }
+        if ($detail && $anyDetailData) {
             $detailLabel = implode(' · ', array_map(function ($sd, $i) {
                 $kgFmt = rtrim(rtrim(number_format($sd['kg'], 1, '.', ''), '0'), '.') . 'kg';
                 $t = 'S' . ($i + 1);

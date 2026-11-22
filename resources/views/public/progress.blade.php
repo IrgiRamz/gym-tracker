@@ -14,7 +14,9 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--soft); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px 14px 40px; color: var(--ink); }
         .hint { font-size: .8rem; color: var(--muted); margin-bottom: 14px; text-align: center; }
-        #storyCardArea { width: 360px; max-width: 100%; aspect-ratio: 9 / 16; background: linear-gradient(160deg, var(--g1) 0%, var(--g2) 100%); padding: 22px 18px; display: flex; flex-direction: column; border-radius: 28px; position: relative; overflow: hidden; }
+        /* Tinggi minimal = rasio 9:16 pada lebar kartu, tapi kartu MEMANJANG mengikuti isi bila kontennya
+           panjang (mis. 5 gerakan dengan rincian per set) supaya tidak ada isi yang terpotong. */
+        #storyCardArea { width: 360px; max-width: 100%; min-height: calc(min(360px, 100vw - 28px) * 16 / 9); background: linear-gradient(160deg, var(--g1) 0%, var(--g2) 100%); padding: 22px 18px; display: flex; flex-direction: column; border-radius: 28px; position: relative; overflow: hidden; }
         #storyCardArea::before { content: ''; position: absolute; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,.12); top: -70px; right: -70px; }
         .head { color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-align: center; margin-bottom: 14px; position: relative; }
         .card { background: #fff; border-radius: 22px; padding: 18px 16px; flex: 1; display: flex; flex-direction: column; position: relative; box-shadow: 0 10px 30px var(--shadow); }
