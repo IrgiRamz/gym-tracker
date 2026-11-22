@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Equipment;
+use App\Models\ExerciseMedia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -12,7 +13,19 @@ class EquipmentController extends Controller
     public function index()
     {
         $equipments = Equipment::orderBy('category')->orderBy('name')->get()->groupBy('category');
-        return view('equipments', ['grouped' => $equipments, 'categories' => Equipment::CATEGORIES]);
+
+        // Bagian Media Gerakan: semua nama gerakan yang dikenal (dari program aktif
+        // + baris exercise_media), masing-masing dipasangkan medianya bila sudah ada.
+        $mediaByKey = ExerciseMedia::all()->keyBy('name_key');
+        $exerciseRows = collect(ExerciseMedia::knownNames())
+            ->map(fn ($name) => ['name' => $name, 'media' => $mediaByKey->get(ExerciseMedia::keyFor($name))])
+            ->all();
+
+        return view('equipments', [
+            'grouped' => $equipments,
+            'categories' => Equipment::CATEGORIES,
+            'exerciseRows' => $exerciseRows,
+        ]);
     }
 
     /** Aturan validasi foto alat (dipakai tambah alat & ganti foto). */

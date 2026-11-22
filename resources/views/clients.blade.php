@@ -251,6 +251,20 @@
     </div>
 </div>
 
+{{-- Lihat contoh gerakan (dari modal program) --}}
+<div class="modal fade" id="exerciseMediaModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="exerciseMediaTitle">Contoh Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body text-center">
+                <video id="exerciseMediaVideo" class="img-fluid rounded-4 d-none" autoplay muted loop playsinline controls></video>
+                <img id="exerciseMediaImg" class="img-fluid rounded-4 d-none" alt="Contoh gerakan">
+                <div id="exerciseMediaCredit" class="small text-secondary mt-2 d-none"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- History sesi & progres klien --}}
 <div class="modal fade" id="historyModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down" style="max-width:540px">
@@ -296,6 +310,10 @@
 (function () {
     // Peta nama alat => URL foto alat (hanya alat yang punya foto).
     const EQUIPMENT_IMAGES = @json($equipmentImages ?? []);
+    // Peta kunci nama gerakan => {url, kind} contoh gerakan (hanya gerakan yang punya media).
+    const EXERCISE_MEDIA = @json($exerciseMedia ?? []);
+    // Kunci pencocokan nama gerakan; wajib identik dengan ExerciseMedia::keyFor() di server.
+    const mvKey = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 
     // --- Choice chips ---
     document.querySelectorAll('[data-chip-group]').forEach(g => g.addEventListener('click', e => {
@@ -482,7 +500,7 @@
         const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
         document.getElementById('programBody').innerHTML = d.programs.map(p => `
             <div class="mb-3"><div class="fw-bold mb-2" style="color:var(--pink-dark)">${esc(p.day_label)}</div>
-            ${p.exercises_json.map(x => `<div class="ex-row">${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm float-end" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}<div class="fw-bold">${esc(x.name)}</div>
+            ${p.exercises_json.map(x => `<div class="ex-row">${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm float-end ms-1" title="Lihat contoh gerakan" data-mv-play="${esc(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm float-end" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}<div class="fw-bold">${esc(x.name)}</div>
                 <div class="small">${esc(x.sets_reps)} &middot; ${x.target_kg > 0 ? esc(x.target_kg) + ' kg' : 'berat badan'} &middot; <span class="text-secondary">${esc(x.equipment)}</span></div>
                 <div class="tip">💡 ${esc(x.tip)}</div></div>`).join('')}</div>`).join('') || '<div class="text-secondary">Belum ada program.</div>';
     });
@@ -494,6 +512,26 @@
         document.getElementById('equipmentImageTitle').textContent = 'Foto ' + b.dataset.eqPhoto;
         document.getElementById('equipmentImageImg').src = url;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('equipmentImageModal')).show();
+    });
+
+    // --- Lihat contoh gerakan dari modal program (ikon putar; hanya muncul bila gerakannya punya media) ---
+    document.getElementById('programBody').addEventListener('click', e => {
+        const b = e.target.closest('[data-mv-play]'); if (!b) return;
+        const m = EXERCISE_MEDIA[mvKey(b.dataset.mvPlay)]; if (!m) return;
+        document.getElementById('exerciseMediaTitle').textContent = 'Gerakan ' + b.dataset.mvPlay;
+        const cr = document.getElementById('exerciseMediaCredit');
+        if (m.credit) { cr.textContent = m.credit; cr.classList.remove('d-none'); } else { cr.textContent = ''; cr.classList.add('d-none'); }
+        const vid = document.getElementById('exerciseMediaVideo'), img = document.getElementById('exerciseMediaImg');
+        if (m.kind === 'video') { img.classList.add('d-none'); img.removeAttribute('src'); vid.classList.remove('d-none'); vid.src = m.url; vid.play().catch(() => {}); }
+        else { vid.classList.add('d-none'); vid.pause(); vid.removeAttribute('src'); img.classList.remove('d-none'); img.src = m.url; }
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('exerciseMediaModal')).show();
+    });
+
+    // Modal contoh gerakan ditutup: hentikan video agar tidak tetap berbunyi/berputar di latar.
+    document.getElementById('exerciseMediaModal').addEventListener('hidden.bs.modal', () => {
+        const vid = document.getElementById('exerciseMediaVideo');
+        vid.pause(); vid.removeAttribute('src'); vid.load();
+        document.getElementById('exerciseMediaImg').removeAttribute('src');
     });
 
     // --- Modal berat badan ---

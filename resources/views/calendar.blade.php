@@ -85,6 +85,20 @@
         </div>
     </div>
 </div>
+
+{{-- Lihat contoh gerakan (dari live session) --}}
+<div class="modal fade" id="exerciseMediaModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="exerciseMediaTitle">Contoh Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body text-center">
+                <video id="exerciseMediaVideo" class="img-fluid rounded-4 d-none" autoplay muted loop playsinline controls></video>
+                <img id="exerciseMediaImg" class="img-fluid rounded-4 d-none" alt="Contoh gerakan">
+                <div id="exerciseMediaCredit" class="small text-secondary mt-2 d-none"></div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -93,6 +107,10 @@
     const CLIENTS = @json($clients);
     // Peta nama alat => URL foto alat (hanya alat yang punya foto).
     const EQUIPMENT_IMAGES = @json($equipmentImages ?? []);
+    // Peta kunci nama gerakan => {url, kind} contoh gerakan (hanya gerakan yang punya media).
+    const EXERCISE_MEDIA = @json($exerciseMedia ?? []);
+    // Kunci pencocokan nama gerakan; wajib identik dengan ExerciseMedia::keyFor() di server.
+    const mvKey = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
     const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const DAYS = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
     const pad = n => String(n).padStart(2, '0');
@@ -263,7 +281,7 @@
         document.getElementById('liveNote').value = '';
         document.getElementById('liveExercises').innerHTML = (s.exercises.length ? s.exercises : []).map((x, i) => `
             <div class="ex-row position-relative" data-i="${i}" data-name="${esc(x.name)}" data-equipment="${esc(x.equipment)}" data-sets-reps="${esc(x.sets_reps)}">
-                ${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm position-absolute top-0 end-0 m-2" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}
+                ${(EXERCISE_MEDIA[mvKey(x.name)] || EQUIPMENT_IMAGES[x.equipment]) ? `<div class="position-absolute top-0 end-0 m-2 d-flex gap-1">${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat contoh gerakan" data-mv-play="${esc(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}</div>` : ''}
                 <div class="fw-bold">${esc(x.name)}</div>
                 <div class="small text-secondary mb-2">Target ${esc(x.sets_reps)}${x.target_kg > 0 ? ' &middot; ' + esc(x.target_kg) + ' kg' : ''} &middot; ${esc(x.equipment)}</div>
                 <div class="set-rows">
@@ -294,6 +312,26 @@
         document.getElementById('equipmentImageTitle').textContent = 'Foto ' + b.dataset.eqPhoto;
         document.getElementById('equipmentImageImg').src = url;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('equipmentImageModal')).show();
+    });
+
+    // Ikon putar di pojok kotak gerakan: lihat contoh gerakan (hanya muncul bila gerakannya punya media).
+    document.getElementById('liveExercises').addEventListener('click', e => {
+        const b = e.target.closest('[data-mv-play]'); if (!b) return;
+        const m = EXERCISE_MEDIA[mvKey(b.dataset.mvPlay)]; if (!m) return;
+        document.getElementById('exerciseMediaTitle').textContent = 'Gerakan ' + b.dataset.mvPlay;
+        const cr = document.getElementById('exerciseMediaCredit');
+        if (m.credit) { cr.textContent = m.credit; cr.classList.remove('d-none'); } else { cr.textContent = ''; cr.classList.add('d-none'); }
+        const vid = document.getElementById('exerciseMediaVideo'), img = document.getElementById('exerciseMediaImg');
+        if (m.kind === 'video') { img.classList.add('d-none'); img.removeAttribute('src'); vid.classList.remove('d-none'); vid.src = m.url; vid.play().catch(() => {}); }
+        else { vid.classList.add('d-none'); vid.pause(); vid.removeAttribute('src'); img.classList.remove('d-none'); img.src = m.url; }
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('exerciseMediaModal')).show();
+    });
+
+    // Modal contoh gerakan ditutup: hentikan video agar tidak tetap berputar di latar.
+    document.getElementById('exerciseMediaModal').addEventListener('hidden.bs.modal', () => {
+        const vid = document.getElementById('exerciseMediaVideo');
+        vid.pause(); vid.removeAttribute('src'); vid.load();
+        document.getElementById('exerciseMediaImg').removeAttribute('src');
     });
 
     // Tambah/kurang baris set per gerakan, fleksibel mengikuti kekuatan klien hari itu.

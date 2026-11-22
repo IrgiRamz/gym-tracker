@@ -1,6 +1,6 @@
 # 00 — Project Overview: Gym Tracker by Neil
 
-> Terakhir diperbarui: 2026-11-21 (login email/nama, seeder 31 alat gym, aturan sisa sesi, toggle alat via AJAX tanpa reload, tombol reset semua alat, foto alat opsional + ikon mata di Lihat Program & live session, pencarian alat, perbaikan cek status WA, lingkar perut opsional, tujuan Persiapan Lari / Marathon + alasan khusus, live session per-set, WA tanpa rincian gerakan, frekuensi PT sampai 5x/minggu). Folder `docs/` adalah **cetak biru proyek**. Baca semua file di folder ini (00 → 03) sebelum mengubah kode.
+> Terakhir diperbarui: 2026-11-22 (login email/nama, seeder 31 alat gym, aturan sisa sesi, toggle alat via AJAX tanpa reload, tombol reset semua alat, foto alat opsional + ikon mata di Lihat Program & live session, pencarian alat, perbaikan cek status WA, lingkar perut opsional, tujuan Persiapan Lari / Marathon + alasan khusus, live session per-set, WA tanpa rincian gerakan, frekuensi PT sampai 5x/minggu, media contoh gerakan + tombol putar di Lihat Program & live session). Folder `docs/` adalah **cetak biru proyek**. Baca semua file di folder ini (00 → 03) sebelum mengubah kode.
 > Dokumen ini ditulis dari kode aktual. Jika kode dan dokumen berbeda, **kode yang benar** — lalu perbaiki dokumennya.
 
 ## Daftar dokumen
@@ -75,9 +75,10 @@ app/
     DashboardController.php       halaman kalender + endpoint /wa-status
     ClientController.php          CRUD klien, edit+regenerate AI, berat badan, paket sesi, history
     ScheduleController.php        jadwal + live session (mulai/batal/selesai)
-    EquipmentController.php       master alat gym
+    EquipmentController.php       master alat gym (+ daftar kelola Media Gerakan)
+    ExerciseMediaController.php   media contoh gerakan (unggah/ganti & hapus)
     PublicProgressController.php  kartu progres publik (tanpa auth)
-  Models/  User, Equipment, Client, WorkoutProgram, Schedule, WeightLog
+  Models/  User, Equipment, ExerciseMedia, Client, WorkoutProgram, Schedule, WeightLog
   Services/
     AiWorkoutService.php          Gemini + template cadangan
     GowaWhatsappService.php       status GoWA, kirim pesan, susun laporan

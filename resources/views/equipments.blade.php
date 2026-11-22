@@ -24,9 +24,9 @@
 @if($grouped->isNotEmpty())
     <div class="input-group mb-2">
         <span class="input-group-text" style="background:#fff"><i class="bi bi-search"></i></span>
-        <input type="text" id="eqSearch" class="form-control" placeholder="Cari alat… misalnya: dumbbell" autocomplete="off">
+        <input type="text" id="eqSearch" class="form-control" placeholder="Cari alat atau gerakan… misalnya: dumbbell" autocomplete="off">
     </div>
-    <div id="eqSearchEmpty" class="text-center text-secondary py-4 d-none">Tidak ada alat yang cocok dengan pencarian "<b id="eqSearchTerm"></b>". Coba kata kunci lain ya.</div>
+    <div id="eqSearchEmpty" class="text-center text-secondary py-4 d-none">Tidak ada alat atau gerakan yang cocok dengan pencarian "<b id="eqSearchTerm"></b>". Coba kata kunci lain ya.</div>
 @endif
 
 @forelse($categories as $cat)
@@ -72,12 +72,67 @@
     <div class="text-center text-secondary small mt-2 mb-3">Tombol ini menghapus seluruh daftar alat, misalnya kalau mau input ulang dari awal.</div>
 @endif
 
+<div class="soft-card mt-4">
+    <label class="form-label">Media Gerakan 🎬</label>
+    <div class="small text-secondary mb-3">Contoh gerakan berupa video pendek yang muter, GIF, atau gambar. Muncul sebagai tombol putar di <b>Lihat Program</b> dan di <b>sesi live</b>, di samping tombol foto alat. Gerakan yang belum ada medianya tidak menampilkan tombol apa pun. Sekali isi, medianya berlaku untuk semua klien yang gerakannya sama.</div>
+    <form method="POST" action="{{ route('gerakan.store') }}" enctype="multipart/form-data">
+        @csrf
+        <input type="text" name="name" class="form-control mb-2" placeholder="Nama gerakan, contoh: Pec Deck" required>
+        <input type="file" name="media" accept="video/mp4,video/webm,video/quicktime,image/*" class="form-control mb-3" required>
+        <button class="btn btn-pink w-100"><i class="bi bi-plus-lg"></i> Tambah Media Gerakan</button>
+    </form>
+</div>
+
+@if(!empty($exerciseRows))
+    <div data-mv-group>
+    <h6 class="fw-bold text-uppercase small mt-3" style="color:var(--muted)">Daftar Gerakan</h6>
+    @foreach($exerciseRows as $row)
+        <div class="agenda-item">
+            @if($row['media']?->media_path)
+                @if($row['media']->kind() === 'video')
+                    <video src="{{ $row['media']->mediaUrl() }}" class="rounded-3 flex-shrink-0" style="width:52px;height:52px;object-fit:cover;cursor:pointer" muted loop playsinline preload="metadata" title="Lihat contoh gerakan" data-mv-view data-name="{{ $row['name'] }}" data-url="{{ $row['media']->mediaUrl() }}" data-kind="video" data-credit="{{ $row['media']->credit }}"></video>
+                @else
+                    <img src="{{ $row['media']->mediaUrl() }}" alt="Contoh {{ $row['name'] }}" class="rounded-3 flex-shrink-0" style="width:52px;height:52px;object-fit:cover;cursor:pointer" title="Lihat contoh gerakan" data-mv-view data-name="{{ $row['name'] }}" data-url="{{ $row['media']->mediaUrl() }}" data-kind="image" data-credit="{{ $row['media']->credit }}">
+                @endif
+            @endif
+            <div class="agenda-body">
+                <div class="nm" data-mv-name>{{ $row['name'] }}</div>
+                <div class="pg">{{ $row['media']?->media_path ? 'Sudah ada contoh gerakan' : 'Belum ada contoh gerakan' }}</div>
+                @if($row['media'])
+                    <form method="POST" action="{{ route('gerakan.destroy', $row['media']) }}" data-confirm="Media gerakan ini akan dihapus. Gerakannya tetap ada di program klien." data-confirm-title="Hapus media gerakan?">@csrf @method('DELETE')
+                        <button class="btn btn-link btn-sm p-0 text-danger text-decoration-none" style="font-size:.72rem">Hapus media</button>
+                    </form>
+                @endif
+            </div>
+            <form method="POST" action="{{ route('gerakan.store') }}" enctype="multipart/form-data">@csrf
+                <input type="hidden" name="name" value="{{ $row['name'] }}">
+                <label class="btn btn-soft btn-sm mb-0" style="cursor:pointer" title="{{ $row['media']?->media_path ? 'Ganti media gerakan' : 'Tambah media gerakan' }}"><i class="bi bi-camera-reels"></i><input type="file" name="media" accept="video/mp4,video/webm,video/quicktime,image/*" class="d-none" data-photo-input></label>
+            </form>
+        </div>
+    @endforeach
+    </div>
+@endif
+
 {{-- Lihat foto alat ukuran penuh --}}
 <div class="modal fade" id="equipmentImageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title fw-bold" id="equipmentImageTitle">Foto Alat</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body text-center"><img id="equipmentImageImg" class="img-fluid rounded-4" alt="Foto alat gym"></div>
+        </div>
+    </div>
+</div>
+
+{{-- Lihat contoh gerakan ukuran penuh --}}
+<div class="modal fade" id="exerciseMediaModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="exerciseMediaTitle">Contoh Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body text-center">
+                <video id="exerciseMediaVideo" class="img-fluid rounded-4 d-none" autoplay muted loop playsinline controls></video>
+                <img id="exerciseMediaImg" class="img-fluid rounded-4 d-none" alt="Contoh gerakan">
+                <div id="exerciseMediaCredit" class="small text-secondary mt-2 d-none"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -107,6 +162,26 @@
             document.getElementById('equipmentImageImg').src = img.dataset.full;
             bootstrap.Modal.getOrCreateInstance(document.getElementById('equipmentImageModal')).show();
         });
+    });
+
+    // Klik thumbnail media gerakan: lihat ukuran penuh di modal (video diputar, gambar ditampilkan).
+    document.querySelectorAll('[data-mv-view]').forEach(el => {
+        el.addEventListener('click', () => {
+            document.getElementById('exerciseMediaTitle').textContent = 'Gerakan ' + el.dataset.name;
+            const cr = document.getElementById('exerciseMediaCredit');
+            if (el.dataset.credit) { cr.textContent = el.dataset.credit; cr.classList.remove('d-none'); } else { cr.textContent = ''; cr.classList.add('d-none'); }
+            const vid = document.getElementById('exerciseMediaVideo'), img = document.getElementById('exerciseMediaImg');
+            if (el.dataset.kind === 'video') { img.classList.add('d-none'); img.removeAttribute('src'); vid.classList.remove('d-none'); vid.src = el.dataset.url; vid.play().catch(() => {}); }
+            else { vid.classList.add('d-none'); vid.pause(); vid.removeAttribute('src'); img.classList.remove('d-none'); img.src = el.dataset.url; }
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('exerciseMediaModal')).show();
+        });
+    });
+
+    // Modal contoh gerakan ditutup: hentikan video agar tidak tetap berputar di latar.
+    document.getElementById('exerciseMediaModal').addEventListener('hidden.bs.modal', () => {
+        const vid = document.getElementById('exerciseMediaVideo');
+        vid.pause(); vid.removeAttribute('src'); vid.load();
+        document.getElementById('exerciseMediaImg').removeAttribute('src');
     });
 
     // Toggle ketersediaan alat via AJAX: halaman tidak reload, scroll tetap di tempat.
@@ -145,6 +220,18 @@
             g.querySelectorAll('.agenda-item').forEach(row => {
                 const nameEl = row.querySelector('[data-eq-name]');
                 const show = catMatch || !q || (nameEl ? nameEl.textContent.toLowerCase().includes(q) : false);
+                row.style.display = show ? '' : 'none';
+                if (show) groupVisible++;
+            });
+            g.style.display = groupVisible ? '' : 'none';
+            visible += groupVisible;
+        });
+        // Daftar gerakan di bagian Media Gerakan ikut disaring dengan kata kunci yang sama.
+        document.querySelectorAll('[data-mv-group]').forEach(g => {
+            let groupVisible = 0;
+            g.querySelectorAll('.agenda-item').forEach(row => {
+                const nameEl = row.querySelector('[data-mv-name]');
+                const show = !q || (nameEl ? nameEl.textContent.toLowerCase().includes(q) : false);
                 row.style.display = show ? '' : 'none';
                 if (show) groupVisible++;
             });

@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EquipmentController;
+use App\Http\Controllers\ExerciseMediaController;
 use App\Http\Controllers\PublicProgressController;
 use App\Http\Controllers\ScheduleController;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +39,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/alat/{equipment}/foto', [EquipmentController::class, 'destroyPhoto'])->name('alat.foto.hapus');
     Route::delete('/alat/{equipment}', [EquipmentController::class, 'destroy'])->name('alat.destroy');
     Route::delete('/alat-reset', [EquipmentController::class, 'reset'])->name('alat.reset');
+
+    Route::post('/gerakan-media', [ExerciseMediaController::class, 'store'])->name('gerakan.store');
+    Route::delete('/gerakan-media/{exerciseMedia}', [ExerciseMediaController::class, 'destroy'])->name('gerakan.destroy');
 
     Route::get('/jadwal', [ScheduleController::class, 'index'])->name('jadwal.index');
     Route::get('/jadwal/berjalan', [ScheduleController::class, 'running'])->name('jadwal.running');

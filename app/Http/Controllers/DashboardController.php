@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\Equipment;
+use App\Models\ExerciseMedia;
 use App\Services\GowaWhatsappService;
 
 class DashboardController extends Controller
@@ -20,7 +21,7 @@ class DashboardController extends Controller
             'programs' => $c->activePrograms->map(fn ($p) => ['id' => $p->id, 'label' => $p->day_label])->values(),
         ]);
 
-        return view('calendar', ['clients' => $clients, 'equipmentImages' => Equipment::imageMap()]);
+        return view('calendar', ['clients' => $clients, 'equipmentImages' => Equipment::imageMap(), 'exerciseMedia' => ExerciseMedia::mediaMap()]);
     }
 
     public function waStatus(GowaWhatsappService $gowa)

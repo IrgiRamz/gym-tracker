@@ -3,7 +3,8 @@
 > Sumber kebenaran: `database/migrations/*` dan `app/Models/*`. Urutan migration aktual:
 > `0001_01_01_000000_create_users_table` (users, password_reset_tokens, **sessions**) · `…000001_create_cache_table` · `…000002_create_jobs_table` ·
 > `2026_01_01_000001_create_equipments_table` · `…000002_create_clients_table` · `…000003_create_workout_programs_table` · `…000004_create_schedules_table` ·
-> `…000005_create_weight_logs_table` · `…000006_add_share_token_to_schedules_table` · `…000007_change_body_focus_to_json_on_clients_table` · `…000008_add_protein_range_to_clients_table`.
+> `…000005_create_weight_logs_table` · `…000006_add_share_token_to_schedules_table` · `…000007_change_body_focus_to_json_on_clients_table` · `…000008_add_protein_range_to_clients_table` ·
+> `…000009_add_image_path_to_equipments_table` · `…000010_add_waist_and_goal_note_to_clients_table` · `…000011_create_exercise_media_table`.
 
 ## Diagram relasi
 
@@ -36,6 +37,18 @@ Tabel pendamping: `password_reset_tokens`, **`sessions`** (dipakai `SESSION_DRIV
 | timestamps | | |
 
 Model `Equipment` memakai `protected $table = 'equipments'`.
+
+### `exercise_media`
+| Kolom | Tipe | Catatan |
+|---|---|---|
+| id | bigint PK | |
+| name | string | nama gerakan seperti di program, mis. "Pec Deck" |
+| name_key | string **unique** | nama ternormalisasi untuk pencocokan (`ExerciseMedia::keyFor()`: huruf kecil, run non-alfanumerik → satu spasi; "Push-Up" → "push up"). Wajib identik dengan `mvKey()` di JavaScript |
+| media_path | string nullable | file contoh gerakan di disk `public` (folder `gerakan`): video mp4/webm/mov, GIF, atau gambar; `null` = belum ada media |
+| credit | string nullable | atribusi sumber media (mis. foto berlisensi CC dari wger), ditampilkan kecil di bawah media pada modal |
+| timestamps | | |
+
+Berdiri sendiri (tanpa relasi): media dicocokkan ke gerakan program murni lewat `name_key` dari nama gerakan di `exercises_json`. Satu media berlaku untuk semua klien yang memakai nama gerakan yang sama. Helper model: `mediaUrl()`, `kind()` (`video` untuk mp4/webm/mov, `image` sisanya), `mediaMap()` (peta `name_key => {url, kind, credit}` untuk halaman Klien & Kalender), `knownNames()` (gabungan nama dari tabel ini + semua program aktif, untuk daftar kelola di halaman Alat Gym).
 
 ### `clients`
 | Kolom | Tipe | Catatan |
@@ -132,7 +145,7 @@ Casting model `Schedule`: `scheduled_date` → `date:Y-m-d`, `started_at`/`finis
 | `WorkoutProgram` | `client()` belongsTo |
 | `Schedule` | `client()` belongsTo · `program()` belongsTo WorkoutProgram via `workout_program_id` |
 | `WeightLog` | tanpa relasi balik (diakses lewat Client) |
-| `Equipment`, `User` | tanpa relasi |
+| `Equipment`, `User`, `ExerciseMedia` | tanpa relasi |
 
 ## Session login 1 tahun
 
