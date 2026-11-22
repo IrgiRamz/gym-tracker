@@ -141,6 +141,9 @@ class ScheduleController extends Controller
             'performance.*.reps' => ['nullable', 'string', 'max:20'],
             'performance.*.sets_reps' => ['nullable', 'string', 'max:50'],
             'performance.*.actual_kg' => ['nullable', 'numeric', 'min:0', 'max:1000'],
+            'performance.*.sets_detail' => ['nullable', 'array', 'max:20'],
+            'performance.*.sets_detail.*.reps' => ['nullable', 'string', 'max:20'],
+            'performance.*.sets_detail.*.kg' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             'coach_note' => ['nullable', 'string', 'max:1000'],
         ], [
             'performance.*.sets.integer' => 'Jumlah set harus berupa angka bulat.',
@@ -150,6 +153,25 @@ class ScheduleController extends Controller
 
         // Simpan nilai aktual lapangan utuh (nama & alat ikut disimpan agar tidak bergantung program yang bisa diganti nanti)
         $performance = collect($data['performance'] ?? [])->map(function ($p) {
+            // Format per-set: sets_detail = [{reps, kg}, ...]. Agregat (sets/reps/actual_kg) diturunkan
+            // darinya agar konsumen lama tetap jalan: sets = jumlah set, actual_kg = beban terberat (top set).
+            $detail = collect($p['sets_detail'] ?? [])->map(fn ($sd) => [
+                'reps' => isset($sd['reps']) && trim((string) $sd['reps']) !== '' ? trim((string) $sd['reps']) : null,
+                'kg' => (float) ($sd['kg'] ?? 0),
+            ])->values()->all();
+            if ($detail) {
+                $sets = count($detail);
+                $reps = $detail[0]['reps'];
+                return [
+                    'name' => $p['name'],
+                    'equipment' => $p['equipment'] ?? null,
+                    'sets' => $sets,
+                    'reps' => $reps,
+                    'sets_reps' => $reps !== null ? "{$sets} x {$reps}" : "{$sets} set",
+                    'actual_kg' => max(array_column($detail, 'kg')),
+                    'sets_detail' => $detail,
+                ];
+            }
             $sets = isset($p['sets']) && $p['sets'] !== '' ? (int) $p['sets'] : null;
             $reps = isset($p['reps']) && trim((string) $p['reps']) !== '' ? trim((string) $p['reps']) : null;
             return [

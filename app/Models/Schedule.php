@@ -46,18 +46,39 @@ class Schedule extends Model
     }
 
     /**
-     * Seragamkan satu item actual_performance_json (format baru: sets/reps/equipment,
-     * format lama: hanya sets_reps teks) menjadi bentuk tunggal untuk WA, History, dan kartu progres.
+     * Seragamkan satu item actual_performance_json menjadi bentuk tunggal untuk History dan kartu progres.
+     * Mendukung tiga format: per-set (sets_detail: repetisi & beban tiap set), agregat (sets/reps/actual_kg),
+     * dan lama (hanya sets_reps teks). Untuk format per-set: sets = jumlah baris set, kg = beban terberat
+     * (top set, dipakai lencana & delta progres), reps hanya terisi bila semua set sama.
      *
-     * @return array{name:string, equipment:?string, sets:?int, reps:?string, kg:?float, sets_label:string, summary:string, line:string}
+     * @return array{name:string, equipment:?string, sets:?int, reps:?string, kg:?float, sets_label:string, summary:string, line:string, sets_detail:array, detail_label:?string}
      */
     public static function normalizePerformance(array $p): array
     {
-        $sets = isset($p['sets']) && $p['sets'] !== '' ? (int) $p['sets'] : null;
-        $reps = isset($p['reps']) && trim((string) $p['reps']) !== '' ? trim((string) $p['reps']) : null;
-        $legacy = trim((string) ($p['sets_reps'] ?? ''));
-        if ($sets === null && $reps === null && $legacy !== '') {
-            [$sets, $reps] = self::parseSetsReps($legacy);
+        // --- Format per-set: sets_detail = [{reps, kg}, ...] ---
+        $detail = [];
+        if (! empty($p['sets_detail']) && is_array($p['sets_detail'])) {
+            foreach ($p['sets_detail'] as $sd) {
+                $detail[] = [
+                    'reps' => isset($sd['reps']) && trim((string) $sd['reps']) !== '' ? trim((string) $sd['reps']) : null,
+                    'kg' => isset($sd['kg']) && $sd['kg'] !== '' && $sd['kg'] !== null ? (float) $sd['kg'] : 0.0,
+                ];
+            }
+        }
+
+        if ($detail) {
+            $sets = count($detail);
+            $repsValues = array_values(array_unique(array_filter(array_column($detail, 'reps'))));
+            $reps = count($repsValues) === 1 ? $repsValues[0] : null;
+            $kg = max(array_column($detail, 'kg'));
+        } else {
+            $sets = isset($p['sets']) && $p['sets'] !== '' ? (int) $p['sets'] : null;
+            $reps = isset($p['reps']) && trim((string) $p['reps']) !== '' ? trim((string) $p['reps']) : null;
+            $legacy = trim((string) ($p['sets_reps'] ?? ''));
+            if ($sets === null && $reps === null && $legacy !== '') {
+                [$sets, $reps] = self::parseSetsReps($legacy);
+            }
+            $kg = isset($p['actual_kg']) && $p['actual_kg'] !== '' ? (float) $p['actual_kg'] : null;
         }
 
         $parts = [];
@@ -69,19 +90,39 @@ class Schedule extends Model
         }
         $setsLabel = implode(' x ', $parts);
 
-        $kg = isset($p['actual_kg']) && $p['actual_kg'] !== '' ? (float) $p['actual_kg'] : null;
         $kgText = ($kg !== null && $kg > 0) ? rtrim(rtrim(number_format($kg, 1, '.', ''), '0'), '.') . ' kg' : null;
-        $summary = trim($setsLabel . ($kgText ? ($setsLabel ? ' @ ' : '@ ') . $kgText : ''));
+        // Untuk per-set, beban di ringkasan adalah top set -> tandai "maks".
+        $summary = trim($setsLabel . ($kgText ? ($setsLabel ? ' @ ' : '@ ') . ($detail ? 'maks ' : '') . $kgText : ''));
 
         $equipment = trim((string) ($p['equipment'] ?? ''));
         $equipment = ($equipment === '' || $equipment === 'Tanpa Alat') ? null : $equipment;
         $name = (string) ($p['name'] ?? 'Gerakan');
+
+        // Label ringkas per set, contoh: "S1 12x5kg · S2 10x7.5kg · S3 8x10kg"
+        $detailLabel = null;
+        if ($detail) {
+            $detailLabel = implode(' · ', array_map(function ($sd, $i) {
+                $kgFmt = rtrim(rtrim(number_format($sd['kg'], 1, '.', ''), '0'), '.') . 'kg';
+                $t = 'S' . ($i + 1);
+                if ($sd['reps'] !== null && $sd['kg'] > 0) {
+                    $t .= ' ' . $sd['reps'] . 'x' . $kgFmt;
+                } elseif ($sd['reps'] !== null) {
+                    $t .= ' ' . $sd['reps'];
+                } elseif ($sd['kg'] > 0) {
+                    $t .= ' ' . $kgFmt;
+                } else {
+                    $t .= ' -';
+                }
+                return $t;
+            }, $detail, array_keys($detail)));
+        }
 
         return [
             'name' => $name, 'equipment' => $equipment, 'sets' => $sets, 'reps' => $reps, 'kg' => $kg,
             'sets_label' => $setsLabel, 'summary' => $summary,
             // contoh: "Squat (Dumbbell): 3 set x 12 reps @ 10 kg"
             'line' => $name . ($equipment ? " ({$equipment})" : '') . ($summary !== '' ? ': ' . $summary : ''),
+            'sets_detail' => $detail, 'detail_label' => $detailLabel,
         ];
     }
 

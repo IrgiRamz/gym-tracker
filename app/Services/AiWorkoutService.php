@@ -63,7 +63,8 @@ class AiWorkoutService
         $user = sprintf(
             'Klien: %s, gender %s, berat %s kg, tinggi %s cm. Tujuan: %s. Fokus bagian tubuh (%d area): %s. Frekuensi PT: %dx/minggu. Catatan: %s',
             $client['name'], $client['gender'], $client['weight_kg'], $client['height_cm'] ?? '-',
-            $client['goal'], count($focus), implode(', ', $focus), $freq, $client['notes'] ?? '-'
+            $client['goal'] . (filled($client['goal_note']) ? ' — ' . $client['goal_note'] : ''),
+            count($focus), implode(', ', $focus), $freq, $client['notes'] ?? '-'
         );
 
         $model = config('services.gemini.model');

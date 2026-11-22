@@ -52,7 +52,7 @@ Halaman Blade (form biasa) memakai redirect + flash `success`; endpoint JSON (`/
 Kartu klien menampilkan: avatar inisial, nama, nomor WA, tag (tujuan, tiap fokus tubuh, frekuensi), statistik (**Sisa sesi**, **Berat** + selisih dari log pertama, **Protein/hari** `min–max g`), catatan, dan tombol: **Edit**, **Hapus**, **Lihat Program**, **History**, **BB**, **Paket**.
 
 ### 3a. Tambah klien (wizard 3 langkah, modal `#wizardModal`)
-1. Data diri: nama, nomor WA, gender (chips), berat, tinggi (opsional). Tidak ada lingkar tubuh (menjaga kenyamanan klien).
+1. Data diri: nama, nomor WA, gender (chips), berat, tinggi (opsional), lingkar perut (opsional, hanya bila klien nyaman diukur). Langkah 2 juga punya kolom bebas **Alasan / tujuan khusus** (`goal_note`, opsional) untuk tujuan yang tidak ada di daftar chips, dan pilihan tujuan **Persiapan Lari / Marathon**.
 2. Tujuan utama (chips), **fokus bagian tubuh (multi-select chips)**, frekuensi 1x/2x/3x, **tingkat keaktifan di luar sesi PT**, paket sesi, catatan.
 3. Ringkasan: **rentang protein real-time** (`75g – 90g / hari`, "Batas minimal aman | Target optimal", panduan porsi ayam/telur/tempe untuk minimal & optimal) + info bahwa AI akan membuat program.
 
@@ -62,7 +62,7 @@ Kartu klien menampilkan: avatar inisial, nama, nomor WA, tag (tujuan, tiap fokus
 Lihat `01-DATABASE-AND-MODELS.md` → "Rentang protein". Di form (klien baru **dan** edit) fungsi `renderProtein()` di `clients.blade.php` menghitung ulang saat berat, gender, tujuan, frekuensi, atau keaktifan berubah. Hasilnya identik dengan server (sudah diuji 864 kombinasi).
 
 ### 3c. Edit klien + generate ulang (modal `#editModal`, `ClientController@update`)
-- Form terisi otomatis (data diambil dari atribut `data-client` pada tombol Edit). Semua field tersedia: nama, WA, gender, berat, tinggi, sisa paket, catatan, tujuan, fokus (multi), frekuensi, keaktifan; rentang protein dihitung real-time.
+- Form terisi otomatis (data diambil dari atribut `data-client` pada tombol Edit). Semua field tersedia: nama, WA, gender, berat, tinggi, lingkar perut, sisa paket, catatan, tujuan, alasan/tujuan khusus, fokus (multi), frekuensi, keaktifan; rentang protein dihitung real-time.
 - Kotak peringatan kuning (`.info-warn`): "⚠️ Info: Jika kamu mengedit … program gerakan AI klien akan dibuat ulang…".
 - Dua tombol submit (`name="regenerate"`):
   - **Simpan Perubahan & Generate Gerakan Baru ✨** (`regenerate=1`): panggil AI (di luar transaksi), lalu dalam transaksi: program aktif lama → `is_active=false`, buat program baru dengan `cycle_number = max(cycle_number)+1`, dan **jadwal mendatang yang belum dimulai** (`status=scheduled`, `started_at null`, tanggal ≥ hari ini) dialihkan ke program baru secara bergilir (Sesi A, B, C…). Sesi `completed`/berjalan **tidak disentuh** → riwayat utuh.
@@ -82,13 +82,13 @@ Modal membaca `activePrograms` (dari atribut `data-client`) dan menampilkan tiap
 Dimuat saat modal dibuka via `GET /klien/{id}/riwayat` (tidak membebani halaman daftar). Respons JSON: `name, total, remaining, first, last, sessions[]`.
 - Ringkasan atas: **Sesi selesai**, **Sisa paket**, tanggal latihan pertama → terakhir.
 - Hanya `status = completed`, urut **terbaru → terlama** (kalkulasi selisih beban dilakukan urut lama → baru).
-- Tiap sesi: tanggal (`translatedFormat('l, d F Y')`), jam mulai, durasi, label program, daftar gerakan dengan nama, alat, **set × repetisi aktual** (`sets_label`, mis. "4 set x 10 reps") + beban riil (kg), **selisih beban vs sesi sebelumnya** untuk gerakan sama (▲ hijau / ▼ oranye), `coach_note`, dan tombol **"Lihat Kartu IG Story 📸"** (jika ada `share_token`) → `/progress/{token}` di tab baru (`target="_blank"`, `data-turbo="false"`).
+- Tiap sesi: tanggal (`translatedFormat('l, d F Y')`), jam mulai, durasi, label program, daftar gerakan dengan nama, alat, **set × repetisi aktual** (`sets_label`, mis. "4 set x 10 reps") + beban riil (kg, untuk sesi per-set = top set), baris ringkas per set (`detail_label`) bila sesi memakai format per-set, **selisih beban vs sesi sebelumnya** untuk gerakan sama (▲ hijau / ▼ oranye, dibandingkan dari top set), `coach_note`, dan tombol **"Lihat Kartu IG Story 📸"** (jika ada `share_token`) → `/progress/{token}` di tab baru (`target="_blank"`, `data-turbo="false"`).
 - Kosong → "Belum ada riwayat sesi selesai untuk klien ini. Yuk mulai sesi pertamanya dari Kalender! 🌸".
 
 ## 4. Generator program AI (`AiWorkoutService`)
 
 - `generate(array $client): array{programs, source}` — `source` = `'ai'` atau `'template'`.
-- **Gemini**: aktif bila `GEMINI_API_KEY` terisi. `POST https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent` dengan header `x-goog-api-key`, `systemInstruction` (aturan + daftar alat), `responseMimeType: application/json`, timeout 40 dtk. Prompt memuat gender, berat, tinggi, tujuan, **seluruh array fokus tubuh** (AI diminta membagi area secara seimbang antar sesi dan mencantumkannya di `day_label`), frekuensi, catatan.
+- **Gemini**: aktif bila `GEMINI_API_KEY` terisi. `POST https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent` dengan header `x-goog-api-key`, `systemInstruction` (aturan + daftar alat), `responseMimeType: application/json`, timeout 40 dtk. Prompt memuat gender, berat, tinggi, tujuan (ditambah `goal_note` bila terisi), **seluruh array fokus tubuh** (AI diminta membagi area secara seimbang antar sesi dan mencantumkannya di `day_label`), frekuensi, catatan.
 - Jumlah sesi = `pt_frequency_per_week` (2x → Sesi A & B). **Gerakan per sesi: minimal 4, maksimal 5** (`MIN_EXERCISES`/`MAX_EXERCISES`; hasil AI dipotong ke 5).
 - **Fallback template** (`fallback()`): dipakai bila key kosong / API gagal / respons tak valid. Memakai pustaka gerakan per area (Bokong, Kaki & Paha, Dada, Punggung, Lengan & Bahu, Perut & Pinggang, Seluruh Tubuh), membagi area fokus bergiliran ke tiap sesi, 1 pemanasan + 4 gerakan utama, mengganti gerakan dengan versi bodyweight bila alat tidak ada, dan melengkapi sampai ≥4 gerakan. Beban awal wanita = 0,6× pengali.
 
@@ -103,7 +103,7 @@ Dimuat saat modal dibuka via `GET /klien/{id}/riwayat` (tidak membebani halaman 
 UI (dropdown klien, dibangun JS dari `CLIENTS` = `{id, name, remaining, booked, programs}` yang dikirim `DashboardController@index`): label `Nama (Sisa N sesi)`; `Nama (Sesi Habis - 0)` dan `Nama (Sisa N sesi, semua sudah terjadwal)` bersifat **disabled**; ada catatan "💡 Klien dengan sisa sesi 0 tidak dapat dijadwalkan. Silakan tambah/top-up sisa sesi terlebih dahulu lewat menu Klien -> Edit." Data `remaining`/`booked` di JS diperbarui lokal setelah tambah/hapus jadwal dan selesai sesi; validasi server tetap menjadi penjaga utama. Jam default = **jam sekarang bila tanggal = hari ini**, selain itu 09:00. Program otomatis bergilir: `activePrograms[count(jadwal klien non-cancelled) % jumlah program]`.
 
 **Live session** (hanya dari jadwal yang ada):
-1. **Mulai** → `POST /jadwal/{id}/mulai` mengisi `started_at = now()` (sekali). Panel "Sesi Sedang Berjalan" terbuka: stopwatch real-time (dihitung dari `started_at`), daftar gerakan program, kolom catatan PT. Bila alat suatu gerakan punya foto, di pojok kanan atas kotak gerakan tampil tombol ikon mata yang membuka foto alat di modal `#equipmentImageModal` (peta `EQUIPMENT_IMAGES` dari `DashboardController@index`); tanpa foto, tombol tidak dirender. Tiap gerakan punya **3 input compact sejajar** (`.live-inputs`, tinggi 46px untuk jempol): **Set**, **Repetisi** (teks singkat, mis. `12` / `10-12` / `30 detik`), **Beban (kg)** (desimal). Nilai awal diambil dari program: `default_sets`/`default_reps` dipecah server dari teks target (`"3 x 12"`) di `ScheduleController::payload()`, beban awal = `target_kg`. PT tinggal menyesuaikan sesuai kondisi lapangan.
+1. **Mulai** → `POST /jadwal/{id}/mulai` mengisi `started_at = now()` (sekali). Panel "Sesi Sedang Berjalan" terbuka: stopwatch real-time (dihitung dari `started_at`), daftar gerakan program, kolom catatan PT. Bila alat suatu gerakan punya foto, di pojok kanan atas kotak gerakan tampil tombol ikon mata yang membuka foto alat di modal `#equipmentImageModal` (peta `EQUIPMENT_IMAGES` dari `DashboardController@index`); tanpa foto, tombol tidak dirender. Tiap gerakan punya **input per set** (`.set-rows`): satu baris untuk tiap set berisi **Repetisi** (teks singkat, mis. `12` / `10-12` / `30 detik`) dan **Beban (kg)** (desimal), plus tombol hapus set. Jumlah baris awal = angka set dari target program (`default_sets`/`default_reps` dipecah server dari teks target `"3 x 12"` di `ScheduleController::payload()`, beban awal tiap baris = `target_kg`), dan PT bisa **Tambah Set** (baris baru menyalin nilai baris terakhir) atau menghapus baris (minimal 1) mengikuti kekuatan klien hari itu. Saat selesai, tiap baris menjadi `sets_detail` di payload (lihat skema di dokumen 01).
 2. **Kecilkan** menutup panel; banner LIVE di kalender; sesi berjalan otomatis dilanjutkan setelah refresh/pindah halaman (`GET /jadwal/berjalan`).
 3. **Batalkan Sesi (salah klik)** → modal konfirmasi merah → `POST …/batal-mulai` mengosongkan `started_at`; jadwal kembali "Mulai"; sisa paket **tidak** berkurang; tidak ada WA.
 4. **Selesai Sesi & Kirim ke WA 💖** → modal konfirmasi → `POST …/selesai` (`ScheduleController@finish`):
@@ -124,19 +124,19 @@ UI (dropdown klien, dibangun JS dari `CLIENTS` = `{id, name, remaining, booked, 
 - **Format laporan** (`buildSessionReport()`), urutan:
   1. Sapaan: "Halo kak {nama depan}! 💖" + terima kasih.
   2. *Ringkasan Sesi*: program, durasi (menit), sisa paket.
-  3. *Pencapaian Gerakan Hari Ini 💪*: satu baris per gerakan dari nilai aktual, format `• Squat (Dumbbell): 3 set x 12 reps @ 10 kg` (alat "Tanpa Alat" tidak ditulis; tanpa beban tidak ada `@ … kg`; repetisi berisi unit seperti "30 detik" tidak diberi kata "reps"). Dibangun dari `Schedule::normalizedPerformance()` (`line`).
-  4. *Catatan dari Coach Neil 📝* (jika ada).
-  5. *Pengingat Nutrisi 🥗*: rentang `min g – max g per hari` (batas minimal & target optimal) + saran porsi pasca-latihan (30% target optimal).
-  6. *Tips Pemulihan 😴* + kalimat motivasi penutup.
-  7. Bila ada `share_token`: blok kartu progres (`📸 *Kartu Progres Mu:*`, kalimat pengantar, lalu **URL di baris baru**: `url('/progress/{token}')`).
-  8. Footer `_- Gym Tracker by Neil_`.
+  3. *Catatan dari Coach Neil 📝* (jika ada).
+  4. *Pengingat Nutrisi 🥗*: rentang `min g – max g per hari` (batas minimal & target optimal) + saran porsi pasca-latihan (30% target optimal).
+  5. *Tips Pemulihan 😴* + kalimat motivasi penutup.
+  6. Bila ada `share_token`: blok kartu progres (`📸 *Kartu Progres Mu:*`, kalimat pengantar, lalu **URL di baris baru**: `url('/progress/{token}')`).
+  7. Footer `_- Gym Tracker by Neil_`.
+  - **Rincian gerakan SENGAJA tidak ada di WA** (dulu ada bagian *Pencapaian Gerakan Hari Ini*): sejak live session mencatat per set, daftar itu membuat WA kepanjangan. Detail gerakan (termasuk per set) hidup di kartu progres dan History.
 - **`APP_URL` harus URL publik** agar link kartu progres bisa dibuka klien.
 
 ## 7. Kartu Progres IG Story (`/progress/{token}`)
 
 - `PublicProgressController@show`: cari `Schedule` dengan `share_token` & `status=completed` (kalau tidak ada → 404). Hitung **Sesi ke-N** (urutan sesi selesai klien) dan total = sesi selesai + sisa paket.
 - View mandiri `resources/views/public/progress.blade.php` (tanpa navigasi admin, `noindex`). Area `#storyCardArea` rasio **9:16** (lebar 360px), gradasi pink `#ec4899 → #f43f5e`, kartu putih. Klien **Pria** → class `theme-navy` (gradasi navy).
-- Isi: header `✨ WORKOUT COMPLETED • {tanggal}`, nama klien, label program, 3 statistik (**Durasi** `X Menit`, **Sesi Ke-** `n/total`, **Protein/hari** `min–max g`), daftar **Highlight Gerakan & Beban Hari Ini** (nama gerakan, **set × repetisi aktual**, dan beban riil; dari `normalizedPerformance()`), kutipan catatan coach, footer **"Personal Trainer: Coach Neil 🌸"** (💪 untuk pria) + watermark "Gym Tracker by Neil".
+- Isi: header `✨ WORKOUT COMPLETED • {tanggal}`, nama klien, label program, 3 statistik (**Durasi** `X Menit`, **Sesi Ke-** `n/total`, **Protein/hari** `min–max g`), daftar **Highlight Gerakan & Beban Hari Ini** (nama gerakan, **set × repetisi aktual**, beban riil = top set; dari `normalizedPerformance()`; sesi format per-set juga menampilkan satu baris ringkas `detail_label`, mis. "S1 12x5kg · S2 10x7.5kg · S3 8x10kg"), kutipan catatan coach, footer **"Personal Trainer: Coach Neil 🌸"** (💪 untuk pria) + watermark "Gym Tracker by Neil".
 - Tombol **"Simpan Gambar untuk IG Story 📸"**: `html2canvas@1.4.1` (cdnjs), `scale: 2`, mengunduh `Progress-{slug-nama}-{YYYY-MM-DD}.png`.
 - Halaman ini publik dan bukan bagian Turbo/PWA shell.
 

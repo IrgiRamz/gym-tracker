@@ -33,7 +33,9 @@ class ClientController extends Controller
             'gender' => ['required', Rule::in(['Wanita', 'Pria'])],
             'weight_kg' => ['required', 'numeric', 'min:20', 'max:300'],
             'height_cm' => ['nullable', 'integer', 'min:100', 'max:230'],
+            'waist_cm' => ['nullable', 'integer', 'min:40', 'max:250'],
             'goal' => ['required', Rule::in(Client::GOALS)],
+            'goal_note' => ['nullable', 'string', 'max:200'],
             'body_focus' => ['required', 'array', 'min:1'],
             'body_focus.*' => [Rule::in(Client::FOCUSES)],
             'pt_frequency_per_week' => ['required', Rule::in([1, 2, 3])],
@@ -197,6 +199,7 @@ class ClientController extends Controller
                 $exercises[] = [
                     'name' => $name, 'equipment' => $p['equipment'], 'sets' => $p['sets'], 'reps' => $p['reps'],
                     'sets_label' => $p['sets_label'], 'kg' => $kg, 'delta' => $delta,
+                    'sets_detail' => $p['sets_detail'], 'detail_label' => $p['detail_label'],
                 ];
             }
             $start = $s->started_at ?? $s->finished_at;

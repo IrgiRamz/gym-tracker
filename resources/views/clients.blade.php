@@ -20,15 +20,16 @@
             </div>
             <div class="d-flex align-items-center gap-1">
                 <button type="button" class="btn btn-soft btn-sm" title="Edit data klien" data-bs-toggle="modal" data-bs-target="#editModal"
-                    data-client="{{ json_encode(['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone, 'gender' => $c->gender, 'weight_kg' => (float) $c->weight_kg, 'height_cm' => $c->height_cm, 'goal' => $c->goal, 'body_focus' => $c->body_focus ?? [], 'pt_frequency_per_week' => (int) $c->pt_frequency_per_week, 'activity_level' => $c->activity_level ?? 'Cukup Aktif', 'remaining_sessions' => (int) $c->remaining_sessions, 'notes' => $c->notes]) }}"><i class="bi bi-pencil-fill"></i> Edit</button>
+                    data-client="{{ json_encode(['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone, 'gender' => $c->gender, 'weight_kg' => (float) $c->weight_kg, 'height_cm' => $c->height_cm, 'waist_cm' => $c->waist_cm, 'goal' => $c->goal, 'goal_note' => $c->goal_note, 'body_focus' => $c->body_focus ?? [], 'pt_frequency_per_week' => (int) $c->pt_frequency_per_week, 'activity_level' => $c->activity_level ?? 'Cukup Aktif', 'remaining_sessions' => (int) $c->remaining_sessions, 'notes' => $c->notes]) }}"><i class="bi bi-pencil-fill"></i> Edit</button>
                 <form method="POST" action="{{ route('klien.destroy', $c) }}" data-confirm="Data {{ $c->name }} beserta seluruh jadwal dan programnya akan dihapus permanen." data-confirm-title="Hapus klien ini?">@csrf @method('DELETE')
                     <button class="btn btn-sm text-danger"><i class="bi bi-trash"></i></button>
                 </form>
             </div>
         </div>
         <div class="mb-2">
-            <span class="tag">{{ $c->goal }}</span>@foreach($c->body_focus ?? [] as $f)<span class="tag">{{ $f }}</span>@endforeach<span class="tag">{{ $c->pt_frequency_per_week }}x / minggu</span>
+            <span class="tag">{{ $c->goal }}</span>@foreach($c->body_focus ?? [] as $f)<span class="tag">{{ $f }}</span>@endforeach<span class="tag">{{ $c->pt_frequency_per_week }}x / minggu</span>@if($c->waist_cm)<span class="tag">Lingkar perut {{ $c->waist_cm }} cm</span>@endif
         </div>
+        @if($c->goal_note)<div class="small text-secondary mb-2">🎯 {{ $c->goal_note }}</div>@endif
         <div class="row g-2 mb-3">
             <div class="col-4"><div class="stat"><b>{{ $c->remaining_sessions }}</b><span>Sisa sesi</span></div></div>
             @php
@@ -80,7 +81,9 @@
                         <div class="col-6"><label class="form-label">Tinggi (cm) <small class="text-secondary fw-normal">opsional</small></label>
                             <input name="height_cm" type="number" class="form-control" inputmode="numeric"></div>
                     </div>
-                    <div class="form-text mt-2">Tidak perlu ukur lingkar tubuh, biar klien tetap nyaman 💗</div>
+                    <div class="mt-3"><label class="form-label">Lingkar perut (cm) <small class="text-secondary fw-normal">opsional</small></label>
+                        <input name="waist_cm" type="number" min="40" max="250" class="form-control" inputmode="numeric" placeholder="Boleh dikosongkan"></div>
+                    <div class="form-text mt-2">Lingkar perut cuma diisi bila klien nyaman diukur ya 💗</div>
                 </div>
 
                 <div class="wstep d-none" data-step="2">
@@ -89,6 +92,8 @@
                             @foreach($goals as $i => $g)<span class="chip {{ $i === 0 ? 'active' : '' }}" data-value="{{ $g }}">{{ $g }}</span>@endforeach
                             <input type="hidden" name="goal" value="{{ $goals[0] }}">
                         </div></div>
+                    <div class="mb-3"><label class="form-label">Alasan / tujuan khusus <small class="text-secondary fw-normal">opsional, bebas ditulis</small></label>
+                        <input name="goal_note" class="form-control" maxlength="200" placeholder="Contoh: mau kuat lari jauh, persiapan marathon bulan Oktober"></div>
                     <div class="mb-3"><label class="form-label">Fokus bagian tubuh <small class="text-secondary fw-normal">bisa pilih lebih dari satu</small></label>
                         <div class="chips" id="focusChips">
                             @foreach($focuses as $f)<span class="chip {{ $f === 'Seluruh Tubuh' ? 'active' : '' }}" data-value="{{ $f }}">{{ $f }}</span>@endforeach
@@ -166,11 +171,15 @@
                     <div class="col-6"><label class="form-label">Tinggi (cm) <small class="text-secondary fw-normal">opsional</small></label>
                         <input name="height_cm" type="number" class="form-control" inputmode="numeric"></div>
                 </div>
+                <div class="mb-3"><label class="form-label">Lingkar perut (cm) <small class="text-secondary fw-normal">opsional</small></label>
+                    <input name="waist_cm" type="number" min="40" max="250" class="form-control" inputmode="numeric" placeholder="Boleh dikosongkan"></div>
                 <div class="mb-3"><label class="form-label">Tujuan utama</label>
                     <div class="chips" data-chip-group="goal">
                         @foreach($goals as $g)<span class="chip" data-value="{{ $g }}">{{ $g }}</span>@endforeach
                         <input type="hidden" name="goal" value="{{ $goals[0] }}">
                     </div></div>
+                <div class="mb-3"><label class="form-label">Alasan / tujuan khusus <small class="text-secondary fw-normal">opsional, bebas ditulis</small></label>
+                    <input name="goal_note" class="form-control" maxlength="200" placeholder="Contoh: mau kuat lari jauh, persiapan marathon bulan Oktober"></div>
                 <div class="mb-3"><label class="form-label">Fokus bagian tubuh <small class="text-secondary fw-normal">bisa pilih lebih dari satu</small></label>
                     <div class="chips" id="editFocusChips">
                         @foreach($focuses as $f)<span class="chip" data-value="{{ $f }}">{{ $f }}</span>@endforeach
@@ -390,7 +399,8 @@
         editForm.action = '/klien/' + d.id;
         document.getElementById('editTitle').textContent = 'Edit ' + d.name + ' ✏️';
         f.name.value = d.name; f.phone.value = d.phone; f.weight_kg.value = d.weight_kg;
-        f.height_cm.value = d.height_cm ?? ''; f.remaining_sessions.value = d.remaining_sessions; f.notes.value = d.notes ?? '';
+        f.height_cm.value = d.height_cm ?? ''; f.waist_cm.value = d.waist_cm ?? ''; f.goal_note.value = d.goal_note ?? '';
+        f.remaining_sessions.value = d.remaining_sessions; f.notes.value = d.notes ?? '';
         editForm.querySelectorAll('[data-chip-group]').forEach(g => {
             const val = String(d[g.dataset.chipGroup]);
             g.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.value === val));
@@ -449,7 +459,7 @@
                         const dl = x.delta === null || x.delta === 0 ? '' :
                             `<span style="font-size:.7rem;font-weight:800;color:${x.delta > 0 ? '#16a34a' : '#d97706'}">${x.delta > 0 ? '▲ +' : '▼ '}${fmtKg(x.delta)} kg</span>`;
                         return `<div class="d-flex justify-content-between align-items-center gap-2 py-1 border-bottom small">
-                            <div><b>${esc(x.name)}</b>${x.equipment ? ` <span class="text-secondary" style="font-size:.7rem">(${esc(x.equipment)})</span>` : ''}<div class="text-secondary" style="font-size:.74rem">${esc(x.sets_label || '-')}</div></div>
+                            <div><b>${esc(x.name)}</b>${x.equipment ? ` <span class="text-secondary" style="font-size:.7rem">(${esc(x.equipment)})</span>` : ''}<div class="text-secondary" style="font-size:.74rem">${esc(x.sets_label || '-')}</div>${x.detail_label ? `<div class="text-secondary" style="font-size:.72rem">${esc(x.detail_label)}</div>` : ''}</div>
                             <div class="text-end"><span class="badge rounded-pill" style="background:var(--pink)">${x.kg ? fmtKg(x.kg) + ' kg' : 'Body weight'}</span><div>${dl}</div></div></div>`;
                     }).join('') : '<div class="small text-secondary">Tidak ada rincian gerakan.</div>'}
                     ${s.coach_note ? `<div class="mt-2 small fst-italic p-2 rounded-3" style="background:var(--surface);border-left:3px solid var(--pink)">“${esc(s.coach_note)}”<div class="fst-normal fw-bold" style="color:var(--pink-dark);font-size:.7rem">- Catatan Coach</div></div>` : ''}

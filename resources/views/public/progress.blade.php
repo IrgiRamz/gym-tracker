@@ -60,7 +60,7 @@
                 @foreach($s->normalizedPerformance() as $p)
                     @php $kg = (float) ($p['kg'] ?? 0); @endphp
                     <div class="ex">
-                        <div class="n">{{ $p['name'] }}<small>{{ $p['sets_label'] }}</small></div>
+                        <div class="n">{{ $p['name'] }}<small>{{ $p['sets_label'] }}</small>@if($p['detail_label'])<small>{{ $p['detail_label'] }}</small>@endif</div>
                         <div class="kg">{{ $kg > 0 ? rtrim(rtrim(number_format($kg, 1, '.', ''), '0'), '.') . ' kg' : 'Body weight' }}</div>
                     </div>
                 @endforeach

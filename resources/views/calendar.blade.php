@@ -235,6 +235,27 @@
 
     // --- Live session ---
     const panel = document.getElementById('livePanel');
+
+    // Satu baris input per set: repetisi & beban aktual khusus set itu.
+    function setRowHtml(repsVal, kgVal) {
+        return `<div class="set-row">
+            <span class="set-no"></span>
+            <div><label>Repetisi</label>
+                <input type="text" maxlength="20" inputmode="text" autocomplete="off" class="form-control set-reps" value="${esc(repsVal ?? '')}" aria-label="Repetisi set"></div>
+            <div><label>Beban (kg)</label>
+                <input type="number" step="0.5" min="0" inputmode="decimal" class="form-control set-kg" value="${kgVal || 0}" aria-label="Beban set dalam kg"></div>
+            <button type="button" class="btn btn-sm btn-outline-danger set-remove" title="Hapus set ini"><i class="bi bi-x-lg"></i></button>
+        </div>`;
+    }
+    // Beri nomor "Set 1..n"; tombol hapus disembunyikan bila tinggal 1 set.
+    function renumberSets(card) {
+        const rows = card.querySelectorAll('.set-row');
+        rows.forEach((r, i) => {
+            r.querySelector('.set-no').textContent = 'Set ' + (i + 1);
+            r.querySelector('.set-remove').style.visibility = rows.length > 1 ? '' : 'hidden';
+        });
+    }
+
     function openLive(s) {
         live = s;
         document.getElementById('liveClient').textContent = s.client_name;
@@ -245,16 +266,13 @@
                 ${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm position-absolute top-0 end-0 m-2" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}
                 <div class="fw-bold">${esc(x.name)}</div>
                 <div class="small text-secondary mb-2">Target ${esc(x.sets_reps)}${x.target_kg > 0 ? ' &middot; ' + esc(x.target_kg) + ' kg' : ''} &middot; ${esc(x.equipment)}</div>
-                <div class="live-inputs">
-                    <div><label>Set</label>
-                        <input type="number" min="0" max="99" inputmode="numeric" class="form-control actual-sets" value="${x.default_sets ?? ''}" aria-label="Set aktual"></div>
-                    <div><label>Repetisi</label>
-                        <input type="text" maxlength="20" inputmode="text" autocomplete="off" class="form-control actual-reps" value="${esc(x.default_reps ?? '')}" aria-label="Repetisi aktual"></div>
-                    <div><label>Beban (kg)</label>
-                        <input type="number" step="0.5" min="0" inputmode="decimal" class="form-control actual-kg" value="${x.target_kg || 0}" aria-label="Beban aktual dalam kg"></div>
+                <div class="set-rows">
+                    ${Array.from({ length: Math.min(Math.max(x.default_sets || 3, 1), 8) }, () => setRowHtml(x.default_reps ?? '', x.target_kg || 0)).join('')}
                 </div>
+                <button type="button" class="btn btn-soft btn-sm w-100 mt-2 add-set-btn"><i class="bi bi-plus-circle"></i> Tambah Set</button>
                 <div class="tip mt-2">💡 ${esc(x.tip)}</div>
             </div>`).join('') || '<div class="text-secondary text-center py-3">Jadwal ini belum punya program gerakan.</div>';
+        panel.querySelectorAll('.ex-row').forEach(renumberSets);
         panel.classList.add('show');
         document.body.style.overflow = 'hidden';
         const start = new Date(s.started_at).getTime();
@@ -277,6 +295,29 @@
         document.getElementById('equipmentImageImg').src = url;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('equipmentImageModal')).show();
     });
+
+    // Tambah/kurang baris set per gerakan, fleksibel mengikuti kekuatan klien hari itu.
+    // Baris baru menyalin repetisi & beban baris terakhir; minimal tersisa 1 set.
+    document.getElementById('liveExercises').addEventListener('click', e => {
+        const add = e.target.closest('.add-set-btn');
+        if (add) {
+            const card = add.closest('.ex-row'), rows = card.querySelector('.set-rows');
+            const last = rows.lastElementChild;
+            rows.insertAdjacentHTML('beforeend', setRowHtml(
+                last ? last.querySelector('.set-reps').value : '',
+                last ? last.querySelector('.set-kg').value : 0));
+            renumberSets(card);
+            return;
+        }
+        const rm = e.target.closest('.set-remove');
+        if (rm) {
+            const card = rm.closest('.ex-row');
+            if (card.querySelectorAll('.set-row').length > 1) {
+                rm.closest('.set-row').remove();
+                renumberSets(card);
+            }
+        }
+    });
     function showBanner() {
         const b = document.getElementById('runningBanner');
         b.classList.toggle('d-none', !live);
@@ -288,14 +329,22 @@
     document.getElementById('finishBtn').onclick = async function () {
         if (!live || !(await confirmModal({ title: 'Selesaikan sesi?', text: 'Sesi akan ditutup, paket sesi klien berkurang 1, dan laporan dikirim ke WhatsApp klien.', yes: 'Ya, selesai & kirim', icon: '💖' }))) return;
         const btn = this; btn.disabled = true; btn.textContent = 'Menyimpan...';
-        const performance = [...document.querySelectorAll('#liveExercises .ex-row')].map(r => ({
-            name: r.dataset.name,
-            equipment: r.dataset.equipment,
-            sets: r.querySelector('.actual-sets').value === '' ? null : parseInt(r.querySelector('.actual-sets').value, 10),
-            reps: r.querySelector('.actual-reps').value.trim() || null,
-            sets_reps: r.dataset.setsReps, // target program (cadangan bila set/reps dikosongkan)
-            actual_kg: parseFloat(r.querySelector('.actual-kg').value) || 0,
-        }));
+        const performance = [...document.querySelectorAll('#liveExercises .ex-row')].map(r => {
+            // Detail per set: tiap baris set menyumbang {reps, kg} sendiri.
+            const detail = [...r.querySelectorAll('.set-row')].map(sr => ({
+                reps: sr.querySelector('.set-reps').value.trim() || null,
+                kg: parseFloat(sr.querySelector('.set-kg').value) || 0,
+            }));
+            return {
+                name: r.dataset.name,
+                equipment: r.dataset.equipment,
+                sets: detail.length || null,
+                reps: detail.find(d => d.reps)?.reps ?? null,
+                sets_reps: r.dataset.setsReps, // target program (cadangan)
+                actual_kg: detail.reduce((m, d) => Math.max(m, d.kg), 0), // beban terberat (top set)
+                sets_detail: detail,
+            };
+        });
         try {
             const res = await api(`/jadwal/${live.id}/selesai`, 'POST', { performance, coach_note: document.getElementById('liveNote').value });
             const cl = CLIENTS.find(x => x.id == res.schedule.client_id);

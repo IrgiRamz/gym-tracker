@@ -46,7 +46,9 @@ Model `Equipment` memakai `protected $table = 'equipments'`.
 | gender | string | `Wanita` \| `Pria` |
 | weight_kg | decimal(5,1) | berat **saat ini** (riwayat di `weight_logs`) |
 | height_cm | unsignedSmallInt, nullable | opsional (100–230) |
-| goal | string | `Client::GOALS`: `Bentuk & Kencangkan`, `Turun Berat Badan`, `Naik Massa Otot`, `Bugar & Sehat` |
+| waist_cm | unsignedSmallInt, nullable | lingkar perut (cm), opsional (40–250); hanya diisi bila klien nyaman diukur |
+| goal | string | `Client::GOALS`: `Bentuk & Kencangkan`, `Turun Berat Badan`, `Naik Massa Otot`, `Bugar & Sehat`, `Persiapan Lari / Marathon` |
+| goal_note | string(200), nullable | alasan/tujuan khusus bebas dari klien (opsional), ikut dikirim ke prompt AI |
 | **body_focus** | **json** | **array string, multi-select** (lihat bawah) |
 | pt_frequency_per_week | unsignedTinyInt default 2 | 1, 2, atau 3 |
 | activity_level | string default `Cukup Aktif` | `Baru Mulai / Santai` \| `Cukup Aktif` \| `Sangat Aktif` |
@@ -105,12 +107,14 @@ Bentuk elemen `exercises_json`:
 
 **Skema `actual_performance_json`** (array, satu elemen per gerakan; disimpan saat "Selesai Sesi"):
 ```json
-{ "name": "Squat", "equipment": "Dumbbell (1 - 25 kg)", "sets": 3, "reps": "12", "sets_reps": "3 x 12", "actual_kg": 10.0 }
+{ "name": "Pec Deck", "equipment": "Mesin Pec Deck", "sets": 3, "reps": "12", "sets_reps": "3 x 12", "actual_kg": 10.0,
+  "sets_detail": [ { "reps": "12", "kg": 5.0 }, { "reps": "10", "kg": 7.5 }, { "reps": "8", "kg": 10.0 } ] }
 ```
 - `name` & `equipment` disalin dari program saat sesi berjalan → riwayat tetap utuh walau program klien diganti/di-generate ulang.
+- **`sets_detail`** (format per-set, yang utama sejak fitur live session per-set): repetisi & beban **tiap set**; jumlah baris fleksibel (PT bisa tambah/kurang set saat sesi). Agregat diturunkan darinya: `sets` = jumlah baris, `actual_kg` = beban terberat (top set), `reps` = repetisi set pertama.
 - `sets` integer atau `null`; `reps` **teks** atau `null` (mis. `"12"`, `"10-12"`, `"30 detik"`, `"10 /kaki"`); `actual_kg` desimal (`0` = bodyweight).
 - `sets_reps` = `"{sets} x {reps}"` bila keduanya terisi, jika tidak berisi target program (kompatibilitas format lama).
-- **Format lama** (sesi sebelum fitur ini) hanya `{name, sets_reps, actual_kg}`. **Jangan membaca JSON ini langsung** untuk tampilan — pakai `Schedule::normalizePerformance()` / `$schedule->normalizedPerformance()` yang menyeragamkan format lama & baru, lalu menyediakan `sets_label` ("3 set x 12 reps") dan `line` ("Squat (Dumbbell): 3 set x 12 reps @ 10 kg"). Parser target program: `Schedule::parseSetsReps("3 x 12") → [3, "12"]`.
+- **Format lama** (sesi sebelum fitur per-set) tanpa `sets_detail`; yang lebih lama lagi hanya `{name, sets_reps, actual_kg}`. **Jangan membaca JSON ini langsung** untuk tampilan — pakai `Schedule::normalizePerformance()` / `$schedule->normalizedPerformance()` yang menyeragamkan semua format, lalu menyediakan `sets_label` ("3 set x 12 reps"), `line`, `sets_detail`, dan `detail_label` ringkas per set ("S1 12x5kg · S2 10x7.5kg · S3 8x10kg"). Untuk format per-set, `kg` hasil normalisasi = top set dan `reps` hanya terisi bila semua set sama. Parser target program: `Schedule::parseSetsReps("3 x 12") → [3, "12"]`.
 
 Casting model `Schedule`: `scheduled_date` → `date:Y-m-d`, `started_at`/`finished_at` → datetime, `actual_performance_json` → array.
 

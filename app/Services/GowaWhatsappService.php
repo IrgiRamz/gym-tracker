@@ -121,7 +121,6 @@ class GowaWhatsappService
         $client = $schedule->client;
         $first = explode(' ', trim($client->name))[0];
         $program = $schedule->program?->day_label ?? 'Latihan Bersama PT';
-        $perf = $schedule->actual_performance_json ?? [];
 
         $lines = [];
         $lines[] = "Halo kak {$first}! 💖";
@@ -132,14 +131,8 @@ class GowaWhatsappService
         $lines[] = "• Durasi: {$schedule->duration_minutes} menit";
         $lines[] = "• Sisa paket sesi: {$client->remaining_sessions}x";
         $lines[] = '';
-        $lines[] = '*Pencapaian Gerakan Hari Ini* 💪';
-        if (empty($perf)) {
-            $lines[] = '• Latihan selesai dengan baik ✨';
-        }
-        foreach ($schedule->normalizedPerformance() as $p) {
-            // contoh: "• Squat (Dumbbell): 3 set x 12 reps @ 10 kg"
-            $lines[] = '• ' . $p['line'];
-        }
+        // Rincian gerakan (termasuk per set) SENGAJA tidak dicantumkan di WA agar pesan tetap ringkas;
+        // detailnya hidup di kartu progres (tautan di bawah) dan di History aplikasi.
         if (filled($schedule->coach_note)) {
             $lines[] = '';
             $lines[] = '*Catatan dari Coach Neil* 📝';

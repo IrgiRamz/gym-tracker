@@ -8,12 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Client extends Model
 {
     protected $fillable = [
-        'name', 'phone', 'gender', 'weight_kg', 'height_cm', 'goal', 'body_focus',
+        'name', 'phone', 'gender', 'weight_kg', 'height_cm', 'waist_cm', 'goal', 'goal_note', 'body_focus',
         'pt_frequency_per_week', 'activity_level', 'remaining_sessions',
         'daily_protein_min', 'daily_protein_max', 'daily_protein_target', 'notes',
     ];
 
-    public const GOALS = ['Bentuk & Kencangkan', 'Turun Berat Badan', 'Naik Massa Otot', 'Bugar & Sehat'];
+    public const GOALS = ['Bentuk & Kencangkan', 'Turun Berat Badan', 'Naik Massa Otot', 'Bugar & Sehat', 'Persiapan Lari / Marathon'];
     public const FOCUSES = ['Bokong (Glutes)', 'Kaki & Paha', 'Dada (Chest)', 'Punggung (Back)', 'Lengan & Bahu', 'Perut & Pinggang', 'Seluruh Tubuh'];
 
     protected $casts = ['body_focus' => 'array'];
@@ -72,6 +72,11 @@ class Client extends Model
         'Bugar & Sehat' => [
             'Pria' => [[1.2, 1.4], [1.4, 1.6], [1.5, 1.8]],
             'Wanita' => [[1.0, 1.2], [1.2, 1.4], [1.4, 1.6]],
+        ],
+        // Daya tahan (lari jauh/marathon): protein sedang, naik seiring beban latihan.
+        'Persiapan Lari / Marathon' => [
+            'Pria' => [[1.2, 1.4], [1.4, 1.6], [1.6, 1.8]],
+            'Wanita' => [[1.1, 1.3], [1.3, 1.5], [1.5, 1.7]],
         ],
     ];
 
