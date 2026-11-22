@@ -1,6 +1,6 @@
 # 00 — Project Overview: Gym Tracker by Neil
 
-> Terakhir diperbarui: 2026-11-21 (login email/nama, seeder 31 alat gym, aturan sisa sesi, toggle alat via AJAX tanpa reload, tombol reset semua alat, foto alat opsional + ikon mata di Lihat Program & live session, pencarian alat, perbaikan cek status WA, lingkar perut opsional, tujuan Persiapan Lari / Marathon + alasan khusus, live session per-set, WA tanpa rincian gerakan). Folder `docs/` adalah **cetak biru proyek**. Baca semua file di folder ini (00 → 03) sebelum mengubah kode.
+> Terakhir diperbarui: 2026-11-21 (login email/nama, seeder 31 alat gym, aturan sisa sesi, toggle alat via AJAX tanpa reload, tombol reset semua alat, foto alat opsional + ikon mata di Lihat Program & live session, pencarian alat, perbaikan cek status WA, lingkar perut opsional, tujuan Persiapan Lari / Marathon + alasan khusus, live session per-set, WA tanpa rincian gerakan, frekuensi PT sampai 5x/minggu). Folder `docs/` adalah **cetak biru proyek**. Baca semua file di folder ini (00 → 03) sebelum mengubah kode.
 > Dokumen ini ditulis dari kode aktual. Jika kode dan dokumen berbeda, **kode yang benar** — lalu perbaiki dokumennya.
 
 ## Daftar dokumen

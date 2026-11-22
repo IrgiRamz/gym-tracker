@@ -50,7 +50,7 @@ Model `Equipment` memakai `protected $table = 'equipments'`.
 | goal | string | `Client::GOALS`: `Bentuk & Kencangkan`, `Turun Berat Badan`, `Naik Massa Otot`, `Bugar & Sehat`, `Persiapan Lari / Marathon` |
 | goal_note | string(200), nullable | alasan/tujuan khusus bebas dari klien (opsional), ikut dikirim ke prompt AI |
 | **body_focus** | **json** | **array string, multi-select** (lihat bawah) |
-| pt_frequency_per_week | unsignedTinyInt default 2 | 1, 2, atau 3 |
+| pt_frequency_per_week | unsignedTinyInt default 2 | 1–5 |
 | activity_level | string default `Cukup Aktif` | `Baru Mulai / Santai` \| `Cukup Aktif` \| `Sangat Aktif` |
 | remaining_sessions | unsignedSmallInt default 0 | sisa paket sesi |
 | **daily_protein_min** | unsignedSmallInt default 0 | batas minimal aman (gram/hari) |
@@ -65,7 +65,7 @@ Aturan: minimal 1 pilihan. Jika `Seluruh Tubuh` ikut terpilih, **hanya** `Seluru
 
 **Rentang protein** (`Client::PROTEIN_MATRIX`, `ACTIVITIES`, `proteinTier()`, `calcProteinRange()`):
 - Matriks `tujuan → gender → [tier1, tier2, tier3]`, tiap tier `[pengali_min, pengali_max]` gram per kg.
-- **Tier dasar** dari frekuensi: 1x→1, 2x→2, 3x→3. **Keaktifan** menggeser tier: `Baru Mulai / Santai` = −1, `Cukup Aktif` = 0, `Sangat Aktif` = +1; hasil dijepit ke 1–3.
+- **Tier dasar** dari frekuensi: 1x→1, 2x→2, 3x ke atas (3–5x)→3. **Keaktifan** menggeser tier: `Baru Mulai / Santai` = −1, `Cukup Aktif` = 0, `Sangat Aktif` = +1; hasil dijepit ke 1–3.
 - Hasil gram = `floor(((round(berat*10)) * round(pengali*10)) / 100 + 0.5)` (aritmetika bulat agar identik dengan JavaScript).
 - Disimpan ke `daily_protein_min`, `daily_protein_max`, dan `daily_protein_target = max`. Dihitung ulang saat: klien dibuat, klien diedit, berat badan diperbarui.
 - Matriks dikirim ke JS lewat `@json(Client::PROTEIN_MATRIX)` → **satu sumber kebenaran**; jangan menduplikasi angka di JS.

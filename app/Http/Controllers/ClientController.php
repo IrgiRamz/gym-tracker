@@ -38,7 +38,7 @@ class ClientController extends Controller
             'goal_note' => ['nullable', 'string', 'max:200'],
             'body_focus' => ['required', 'array', 'min:1'],
             'body_focus.*' => [Rule::in(Client::FOCUSES)],
-            'pt_frequency_per_week' => ['required', Rule::in([1, 2, 3])],
+            'pt_frequency_per_week' => ['required', Rule::in([1, 2, 3, 4, 5])],
             'activity_level' => ['required', Rule::in(array_keys(Client::ACTIVITIES))],
             'remaining_sessions' => ['required', 'integer', 'min:0', 'max:200'],
             'notes' => ['nullable', 'string', 'max:1000'],

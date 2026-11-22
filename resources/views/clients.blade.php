@@ -106,6 +106,8 @@
                             <span class="chip" data-value="1">1x</span>
                             <span class="chip active" data-value="2">2x</span>
                             <span class="chip" data-value="3">3x</span>
+                            <span class="chip" data-value="4">4x</span>
+                            <span class="chip" data-value="5">5x</span>
                             <input type="hidden" name="pt_frequency_per_week" value="2">
                         </div></div>
                     <div class="mb-3"><label class="form-label">Tingkat keaktifan di luar sesi PT</label>
@@ -192,6 +194,8 @@
                         <span class="chip" data-value="1">1x</span>
                         <span class="chip" data-value="2">2x</span>
                         <span class="chip" data-value="3">3x</span>
+                        <span class="chip" data-value="4">4x</span>
+                        <span class="chip" data-value="5">5x</span>
                         <input type="hidden" name="pt_frequency_per_week" value="2">
                     </div></div>
                 <div class="mb-3"><label class="form-label">Tingkat keaktifan di luar sesi PT</label>
