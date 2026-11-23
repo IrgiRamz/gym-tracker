@@ -36,6 +36,41 @@ class AiWorkoutService
         return false;
     }
 
+    /** Nama gerakan bodyweight murni: tidak boleh masuk program walau AI menandainya beralat (mis. di atas matras). */
+    private function isBodyweightName(string $name): bool
+    {
+        foreach (['plank', 'push up', 'push-up', 'pushup', 'superman', 'burpee', 'mountain climber', 'jumping jack', 'sit up', 'sit-up', 'dead bug'] as $kw) {
+            if (stripos($name, $kw) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Nama alat resmi dari daftar tersedia bila gerakan AI ini memakai alat itu;
+     * null bila gerakannya tanpa alat atau alatnya tidak ada di daftar.
+     * Program WAJIB hanya berisi gerakan beralat (keputusan Irgi 2026-11-23:
+     * ke gym ya memakai alat gym, bukan gerakan bodyweight).
+     */
+    private function matchedEquipment(array $e, array $equipments): ?string
+    {
+        if ($this->isBodyweightName((string) ($e['name'] ?? ''))) {
+            return null;
+        }
+        $given = strtolower(trim((string) ($e['equipment'] ?? '')));
+        if ($given === '' || $given === 'tanpa alat' || $given === 'bodyweight') {
+            return null;
+        }
+        foreach ($equipments as $eq) {
+            $eqL = strtolower($eq);
+            if ($given === $eqL || stripos($eqL, $given) !== false || stripos($given, $eqL) !== false) {
+                return $eq;
+            }
+        }
+        return null;
+    }
+
     /**
      * Hasilkan program latihan: array of ['day_label' => string, 'exercises' => [...]].
      * Selalu mengembalikan hasil (fallback template jika AI tidak tersedia).
@@ -92,11 +127,12 @@ class AiWorkoutService
         $max = $this->maxExercises($client, $freq);
 
         $system = "Kamu adalah personal trainer profesional yang ramah. Buat program latihan 1 siklus dalam Bahasa Indonesia. "
-            . "WAJIB hanya memakai alat dari daftar berikut (atau 'Tanpa Alat' untuk gerakan bodyweight): "
+            . "WAJIB: setiap gerakan HARUS memakai satu alat dari daftar berikut, tanpa kecuali: "
             . implode('; ', $equipments) . '. '
             . "Balas HANYA JSON array berisi tepat {$freq} sesi. Format tiap sesi: "
-            . '{"day_label":"Sesi A - Bokong (Glutes)","exercises":[{"name":"...","equipment":"(nama persis dari daftar alat atau Tanpa Alat)","sets_reps":"3 x 12","target_kg":0,"tip":"tips singkat"}]}. '
-            . "Isi MINIMAL {$min} dan MAKSIMAL {$max} gerakan utama per sesi. Pemanasan (jalan cepat, treadmill, sepeda statis, elliptical, peregangan) BUKAN gerakan: jangan masukkan ke daftar exercises sama sekali. Urutkan dari gerakan utama ke gerakan pendukung. target_kg berupa angka (0 jika bodyweight), konservatif untuk pemula. "
+            . '{"day_label":"Sesi A - Bokong (Glutes)","exercises":[{"name":"...","equipment":"(nama persis dari daftar alat)","sets_reps":"3 x 12","target_kg":0,"tip":"tips singkat"}]}. '
+            . "Isi MINIMAL {$min} dan MAKSIMAL {$max} gerakan utama per sesi. Pemanasan (jalan cepat, treadmill, sepeda statis, elliptical, peregangan) BUKAN gerakan: jangan masukkan ke daftar exercises sama sekali. Urutkan dari gerakan utama ke gerakan pendukung. target_kg berupa angka perkiraan beban alat, konservatif untuk pemula. "
+            . "Gerakan bodyweight/tanpa alat (push up, plank, superman, burpee, sit up, dan sejenisnya) DILARANG KERAS: klien datang ke gym untuk memakai alat gym. "
             . 'Klien bisa memiliki BEBERAPA fokus bagian tubuh. Bagi porsi latihan secara seimbang di seluruh sesi mingguan sehingga semua area fokus tertangani '
             . '(contoh: Sesi A fokus Bokong, Sesi B fokus Punggung). Cantumkan area fokus utama tiap sesi pada day_label. '
             . "Jika fokusnya 'Seluruh Tubuh', buat tiap sesi menyeluruh dengan variasi gerakan.";
@@ -136,9 +172,13 @@ class AiWorkoutService
                 if (empty($e['name']) || $this->isWarmup((string) $e['name'])) {
                     continue; // nama kosong atau gerakan pemanasan tidak dihitung sebagai gerakan
                 }
+                $eq = $this->matchedEquipment($e, $equipments);
+                if ($eq === null) {
+                    continue; // gerakan tanpa alat / alatnya tidak ada di daftar: program wajib beralat semua
+                }
                 $ex[] = [
                     'name' => (string) $e['name'],
-                    'equipment' => (string) ($e['equipment'] ?? 'Tanpa Alat'),
+                    'equipment' => $eq,
                     'sets_reps' => (string) ($e['sets_reps'] ?? '3 x 12'),
                     'target_kg' => (float) ($e['target_kg'] ?? 0),
                     'tip' => (string) ($e['tip'] ?? ''),
@@ -178,84 +218,76 @@ class AiWorkoutService
             return null;
         };
 
-        // Bangun satu gerakan. Jika alat tidak ada, pakai gerakan bodyweight pengganti ($alt) atau lewati.
-        // $kw null = gerakan bodyweight (tanpa alat).
-        $ex = function (string $name, string|array|null $kw, string $sets, float $target, string $tip, ?string $alt = null) use ($find, $base) {
+        // Bangun satu gerakan. Gerakan WAJIB beralat: alatnya tidak ditemukan -> gerakan dilewati (null).
+        // Tidak ada lagi gerakan bodyweight atau pengganti bodyweight (keputusan Irgi 2026-11-23).
+        $ex = function (string $name, string|array|null $kw, string $sets, float $target, string $tip) use ($find, $base) {
             $eq = $kw ? $find($kw) : null;
-            if ($kw && ! $eq) {
-                if (! $alt) {
-                    return null;
-                }
-                return ['name' => $alt, 'equipment' => 'Tanpa Alat', 'sets_reps' => $sets, 'target_kg' => 0, 'tip' => $tip];
+            if (! $eq) {
+                return null;
             }
             return [
-                'name' => $name, 'equipment' => $eq ?? 'Tanpa Alat', 'sets_reps' => $sets,
-                'target_kg' => $eq ? round($target * $base * 2) / 2 : 0, 'tip' => $tip,
+                'name' => $name, 'equipment' => $eq, 'sets_reps' => $sets,
+                'target_kg' => round($target * $base * 2) / 2, 'tip' => $tip,
             ];
         };
 
         $lib = [
-            // Urutan = prioritas. Gerakan tanpa alat (kw null) adalah bodyweight di area gym.
+            // Urutan = prioritas. Semua gerakan memakai alat dari daftar alat yang tersedia.
             'Bokong (Glutes)' => [
-                $ex('Hip Thrust', ['hip thrust', 'barbell'], '3 x 12', 20, 'Remas bokong di puncak gerakan.', 'Glute Bridge'),
-                $ex('Romanian Deadlift', 'dumbbell', '3 x 12', 6, 'Punggung lurus, dorong pinggul ke belakang.', 'Good Morning Bodyweight'),
-                $ex('Glute Kickback Machine', 'glute kickback', '3 x 12 /kaki', 10, 'Dorong dengan tumit, jangan melengkungkan punggung.', 'Donkey Kick'),
-                $ex('Hip Abduction Machine', 'hip abduction', '3 x 15', 20, 'Buka perlahan, tahan sebentar di ujung gerakan.'),
-                $ex('Glute Bridge', null, '3 x 15', 0, 'Tahan 2 detik di atas.'),
-                $ex('Donkey Kick', null, '3 x 15 /kaki', 0, 'Jaga pinggul tetap rata.'),
+                $ex('Hip Thrust', ['hip thrust', 'barbell'], '3 x 12', 20, 'Remas bokong di puncak gerakan.'),
+                $ex('Romanian Deadlift', 'dumbbell', '3 x 12', 6, 'Punggung lurus, dorong pinggul ke belakang.'),
+                $ex('Cable Kickback', 'cable', '3 x 12 /kaki', 5, 'Pasang tali pergelangan kaki, dorong kaki ke belakang dengan tumit.'),
+                $ex('Smith Machine Squat', 'smith', '3 x 10', 15, 'Kaki sedikit di depan, dada tegak.'),
+                $ex('Leg Press', 'leg press', '3 x 12', 30, 'Kaki agak tinggi di pijakan untuk menekan bokong.'),
+                $ex('Leg Curl', 'leg curl', '3 x 12', 15, 'Tarik tumit ke arah bokong, gerakan terkontrol.'),
             ],
             'Kaki & Paha' => [
-                $ex('Goblet Squat', 'dumbbell', '3 x 12', 6, 'Punggung tegak, lutut searah jari kaki.', 'Bodyweight Squat'),
-                $ex('Leg Press', 'leg press', '3 x 12', 30, 'Jangan kunci lutut di ujung gerakan.', 'Wall Sit'),
+                $ex('Goblet Squat', 'dumbbell', '3 x 12', 6, 'Punggung tegak, lutut searah jari kaki.'),
+                $ex('Leg Press', 'leg press', '3 x 12', 30, 'Jangan kunci lutut di ujung gerakan.'),
                 $ex('Leg Extension', 'leg extension', '3 x 12', 15, 'Tahan 1 detik di atas, turun perlahan.'),
                 $ex('Leg Curl', 'leg curl', '3 x 12', 15, 'Tarik tumit ke arah bokong, gerakan terkontrol.'),
-                $ex('Walking Lunges', 'dumbbell', '2 x 10 /kaki', 4, 'Langkah cukup lebar, lutut stabil.', 'Lunges Bodyweight'),
+                $ex('Walking Lunges', 'dumbbell', '2 x 10 /kaki', 4, 'Langkah cukup lebar, lutut stabil.'),
                 $ex('Hack Squat', 'hack squat', '3 x 10', 20, 'Punggung menempel sandaran, turun sampai nyaman.'),
                 $ex('Smith Machine Squat', 'smith', '3 x 10', 15, 'Kaki sedikit di depan, dada tegak.'),
-                $ex('Calf Raise', ['calf raise'], '3 x 15', 20, 'Naik perlahan, turun terkontrol.', 'Calf Raise Bodyweight'),
+                $ex('Calf Raise', ['leg press', 'smith'], '3 x 15', 20, 'Naik perlahan dengan ujung kaki, turun terkontrol.'),
             ],
             'Dada (Chest)' => [
-                $ex('Chest Press Machine', 'chest press', '3 x 12', 15, 'Hembuskan napas saat mendorong, bahu turun.', 'Push Up Lutut'),
-                $ex('Dumbbell Bench Press', 'bench', '3 x 12', 5, 'Siku sekitar 45 derajat dari badan.', 'Push Up Lutut'),
+                $ex('Chest Press Machine', ['chest press', 'bench press'], '3 x 12', 15, 'Hembuskan napas saat mendorong, bahu turun.'),
+                $ex('Dumbbell Bench Press', 'bench', '3 x 12', 5, 'Siku sekitar 45 derajat dari badan.'),
                 $ex('Pec Deck', 'pec deck', '3 x 12', 15, 'Peras dada di tengah, jangan angkat bahu.'),
-                $ex('Incline Dumbbell Press', 'incline', '3 x 10', 5, 'Dorong ke atas dada, siku tidak terlalu lebar.'),
+                $ex('Incline Dumbbell Press', ['adjustable bench', 'bench'], '3 x 10', 5, 'Atur sandaran miring ke atas, dorong ke atas dada.'),
                 $ex('Cable Fly', 'cable', '3 x 12', 5, 'Siku sedikit ditekuk, peluk ke depan dada.'),
-                $ex('Push Up', null, '3 x 8', 0, 'Badan lurus, boleh di lutut dulu.'),
             ],
             'Punggung (Back)' => [
-                $ex('Lat Pulldown', 'lat pulldown', '3 x 12', 20, 'Tarik siku ke arah pinggang.', 'Superman Hold'),
-                $ex('Seated Row', 'seated row', '3 x 12', 15, 'Dada terbuka, bahu turun.', 'Reverse Snow Angel'),
-                $ex('Dumbbell Row', 'dumbbell', '3 x 12', 5, 'Punggung rata, tarik dengan siku.', 'Superman'),
-                $ex('Assisted Pull-Up', 'assisted', '3 x 8', 20, 'Tarik dagu melewati bar, turun perlahan.'),
-                $ex('Back Extension', 'back extension', '3 x 12', 0, 'Naik sampai badan lurus, jangan berlebihan melengkung.', 'Superman'),
-                $ex('Superman', null, '3 x 12', 0, 'Angkat dada dan kaki pelan-pelan.'),
+                $ex('Lat Pulldown', 'lat pulldown', '3 x 12', 20, 'Tarik siku ke arah pinggang.'),
+                $ex('Seated Row', 'seated row', '3 x 12', 15, 'Dada terbuka, bahu turun.'),
+                $ex('Dumbbell Row', 'dumbbell', '3 x 12', 5, 'Punggung rata, tarik dengan siku.'),
+                $ex('Deadlift', 'deadlift', '3 x 10', 20, 'Punggung lurus, dorong lantai dengan kaki.'),
+                $ex('Straight Arm Pulldown', 'cable', '3 x 12', 10, 'Lengan hampir lurus, tarik dari punggung samping.'),
             ],
             'Lengan & Bahu' => [
-                $ex('Dumbbell Shoulder Press', 'dumbbell', '3 x 12', 4, 'Jaga perut tetap kencang.', 'Pike Push Up'),
+                $ex('Dumbbell Shoulder Press', 'dumbbell', '3 x 12', 4, 'Jaga perut tetap kencang.'),
                 $ex('Lateral Raise', 'dumbbell', '3 x 12', 2, 'Siku sedikit ditekuk, jangan diayun.'),
                 $ex('Bicep Curl', ['dumbbell', 'ez bar'], '3 x 12', 3, 'Siku tetap dekat badan.'),
                 $ex('Triceps Pushdown', 'cable', '3 x 12', 10, 'Siku menempel badan, tekan sampai lurus.'),
                 $ex('Shoulder Press Machine', 'shoulder press', '3 x 12', 10, 'Jangan kunci siku di atas.'),
-                $ex('Triceps Extension', 'dumbbell', '3 x 12', 3, 'Siku menghadap ke depan.', 'Triceps Dip Kursi'),
+                $ex('Triceps Extension', 'dumbbell', '3 x 12', 3, 'Siku menghadap ke depan.'),
             ],
             'Perut & Pinggang' => [
-                $ex('Plank', null, '3 x 30 detik', 0, 'Perut kencang, badan lurus.'),
                 $ex('Cable Crunch', 'cable', '3 x 15', 10, 'Tekuk dari perut, bukan dari tarikan lengan.'),
-                $ex('Russian Twist', null, '3 x 20', 0, 'Putar dari pinggang, bukan lengan.'),
-                $ex('Ab Crunch Machine', 'ab crunch', '3 x 15', 15, 'Hembuskan napas saat menekuk badan.'),
-                $ex('Dead Bug', null, '3 x 10', 0, 'Pinggang menempel lantai.'),
-                $ex('Bicycle Crunch', null, '3 x 20', 0, 'Pelan dan terkontrol.'),
+                $ex('Russian Twist', 'dumbbell', '3 x 20', 3, 'Pegang satu dumbbell di depan dada, putar dari pinggang.'),
+                $ex('Cable Woodchopper', 'cable', '3 x 12 /sisi', 5, 'Putar badan menyamping dengan perut, lengan mengikuti.'),
             ],
             'Seluruh Tubuh' => [
-                $ex('Squat', 'dumbbell', '3 x 12', 6, 'Turun sampai paha sejajar lantai.', 'Bodyweight Squat'),
-                $ex('Chest Press', 'chest press', '3 x 12', 15, 'Hembuskan napas saat mendorong.', 'Push Up Lutut'),
-                $ex('Seated Row', 'seated row', '3 x 12', 15, 'Dada terbuka, bahu turun.', 'Superman'),
-                $ex('Lunges', 'dumbbell', '2 x 10 /kaki', 4, 'Lutut tidak melewati ujung kaki.', 'Lunges Bodyweight'),
-                $ex('Plank', null, '3 x 30 detik', 0, 'Perut kencang, badan lurus.'),
-                $ex('Dead Bug', null, '3 x 10', 0, 'Pinggang menempel lantai.'),
+                $ex('Squat', 'dumbbell', '3 x 12', 6, 'Turun sampai paha sejajar lantai.'),
+                $ex('Chest Press', ['chest press', 'bench press'], '3 x 12', 15, 'Hembuskan napas saat mendorong.'),
+                $ex('Seated Row', 'seated row', '3 x 12', 15, 'Dada terbuka, bahu turun.'),
+                $ex('Lunges', 'dumbbell', '2 x 10 /kaki', 4, 'Lutut tidak melewati ujung kaki.'),
+                $ex('Leg Press', 'leg press', '3 x 12', 30, 'Jangan kunci lutut di ujung gerakan.'),
+                $ex('Lat Pulldown', 'lat pulldown', '3 x 12', 20, 'Tarik siku ke arah pinggang.'),
             ],
         ];
-        // Buang gerakan yang dilewati (alat tidak ada) dan gerakan kembar (mis. pengganti bodyweight yang sama)
+        // Buang gerakan yang dilewati (alat tidak ada) dan gerakan kembar dalam satu area
         $lib = array_map(function ($list) {
             $seen = [];
             $out = [];
@@ -304,7 +336,7 @@ class AiWorkoutService
             }
             $exercises = array_values(array_filter($exercises));
             // Jika ada gerakan yang terlewat (alat tidak ada), lengkapi sampai jumlah minimal
-            foreach (array_merge($lib['Perut & Pinggang'], $lib['Seluruh Tubuh']) as $filler) {
+            foreach (array_merge($lib['Seluruh Tubuh'], $lib['Perut & Pinggang']) as $filler) {
                 if (count($exercises) >= $min) {
                     break;
                 }
