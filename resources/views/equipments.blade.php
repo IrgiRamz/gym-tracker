@@ -24,9 +24,9 @@
 @if($grouped->isNotEmpty())
     <div class="input-group mb-2">
         <span class="input-group-text" style="background:#fff"><i class="bi bi-search"></i></span>
-        <input type="text" id="eqSearch" class="form-control" placeholder="Cari alat atau gerakan… misalnya: dumbbell" autocomplete="off">
+        <input type="text" id="eqSearch" class="form-control" placeholder="Cari alat… misalnya: dumbbell" autocomplete="off">
     </div>
-    <div id="eqSearchEmpty" class="text-center text-secondary py-4 d-none">Tidak ada alat atau gerakan yang cocok dengan pencarian "<b id="eqSearchTerm"></b>". Coba kata kunci lain ya.</div>
+    <div id="eqSearchEmpty" class="text-center text-secondary py-4 d-none">Tidak ada alat yang cocok dengan pencarian "<b id="eqSearchTerm"></b>". Coba kata kunci lain ya.</div>
 @endif
 
 @forelse($categories as $cat)
@@ -66,7 +66,7 @@
 @endif
 
 @if($grouped->isNotEmpty())
-    <form method="POST" action="{{ route('alat.reset') }}" class="mt-4" data-confirm="Semua alat gym akan dihapus permanen dan daftarnya jadi kosong lagi dari 0. Kamu harus input ulang satu per satu, dan AI hanya akan memakai gerakan tanpa alat sampai ada alat baru. Yakin mau reset?" data-confirm-title="Reset semua alat gym?" data-confirm-yes="Ya, Reset Semua">@csrf @method('DELETE')
+    <form method="POST" action="{{ route('alat.reset') }}" class="mt-4" data-confirm="Semua alat gym akan dihapus permanen dan daftarnya jadi kosong lagi dari 0. Kamu harus input ulang satu per satu, dan program tidak bisa dibuat sampai ada alat baru karena semua gerakan wajib memakai alat. Yakin mau reset?" data-confirm-title="Reset semua alat gym?" data-confirm-yes="Ya, Reset Semua">@csrf @method('DELETE')
         <button class="btn btn-outline-danger w-100 rounded-3"><i class="bi bi-arrow-counterclockwise"></i> Reset Semua Alat</button>
     </form>
     <div class="text-center text-secondary small mt-2 mb-3">Tombol ini menghapus seluruh daftar alat, misalnya kalau mau input ulang dari awal.</div>
@@ -84,6 +84,11 @@
 </div>
 
 @if(!empty($exerciseRows))
+    <div class="input-group mb-2 mt-4">
+        <span class="input-group-text" style="background:#fff"><i class="bi bi-search"></i></span>
+        <input type="text" id="mvSearch" class="form-control" placeholder="Cari gerakan… misalnya: squat" autocomplete="off">
+    </div>
+    <div id="mvSearchEmpty" class="text-center text-secondary py-4 d-none">Tidak ada gerakan yang cocok dengan pencarian "<b id="mvSearchTerm"></b>". Coba kata kunci lain ya.</div>
     <div data-mv-group>
     <h6 class="fw-bold text-uppercase small mt-3" style="color:var(--muted)">Daftar Gerakan</h6>
     @foreach($exerciseRows as $row)
@@ -226,20 +231,23 @@
             g.style.display = groupVisible ? '' : 'none';
             visible += groupVisible;
         });
-        // Daftar gerakan di bagian Media Gerakan ikut disaring dengan kata kunci yang sama.
-        document.querySelectorAll('[data-mv-group]').forEach(g => {
-            let groupVisible = 0;
-            g.querySelectorAll('.agenda-item').forEach(row => {
-                const nameEl = row.querySelector('[data-mv-name]');
-                const show = !q || (nameEl ? nameEl.textContent.toLowerCase().includes(q) : false);
-                row.style.display = show ? '' : 'none';
-                if (show) groupVisible++;
-            });
-            g.style.display = groupVisible ? '' : 'none';
-            visible += groupVisible;
-        });
         document.getElementById('eqSearchTerm').textContent = eqSearch.value.trim();
         document.getElementById('eqSearchEmpty').classList.toggle('d-none', visible > 0);
+    });
+
+    // Cari gerakan: saring daftar gerakan di bagian Media Gerakan, langsung saat mengetik.
+    const mvSearch = document.getElementById('mvSearch');
+    if (mvSearch) mvSearch.addEventListener('input', () => {
+        const q = mvSearch.value.trim().toLowerCase();
+        let visible = 0;
+        document.querySelectorAll('[data-mv-group] .agenda-item').forEach(row => {
+            const nameEl = row.querySelector('[data-mv-name]');
+            const show = !q || (nameEl ? nameEl.textContent.toLowerCase().includes(q) : false);
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        document.getElementById('mvSearchTerm').textContent = mvSearch.value.trim();
+        document.getElementById('mvSearchEmpty').classList.toggle('d-none', visible > 0);
     });
 })();
 </script>
