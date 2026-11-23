@@ -13,7 +13,7 @@
 @if($clients->isNotEmpty())
     <div class="input-group mb-3">
         <span class="input-group-text" style="background:#fff"><i class="bi bi-search"></i></span>
-        <input type="text" id="clientSearch" class="form-control" placeholder="Cari nama klien… misalnya: ayang" autocomplete="off">
+        <input type="text" id="clientSearch" class="form-control" placeholder="Cari nama" autocomplete="off">
     </div>
     <div id="clientSearchEmpty" class="text-center text-secondary py-4 d-none">Tidak ada klien yang cocok dengan pencarian "<b id="clientSearchTerm"></b>". Coba nama lain ya.</div>
 @endif
