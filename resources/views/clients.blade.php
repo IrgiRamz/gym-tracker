@@ -30,7 +30,9 @@
         </button>
         <div class="client-detail"><div class="client-detail-inner"><div style="padding-top:10px">
             <div class="mb-2">
-                <span class="tag">{{ $c->goal }}</span>@foreach($c->body_focus ?? [] as $f)<span class="tag">{{ $f }}</span>@endforeach<span class="tag">{{ $c->pt_frequency_per_week }}x / minggu</span>@if($c->age)<span class="tag">Umur {{ $c->age }} th</span>@endif@if($c->waist_cm)<span class="tag">Lingkar perut {{ $c->waist_cm }} cm</span>@endif
+                <span class="tag">{{ $c->goal }}</span>@foreach($c->body_focus ?? [] as $f)<span class="tag">{{ $f }}</span>@endforeach<span class="tag">{{ $c->pt_frequency_per_week }}x / minggu</span>
+                @if($c->age)<span class="tag">Umur {{ $c->age }} th</span>@endif
+                @if($c->waist_cm)<span class="tag">Lingkar perut {{ $c->waist_cm }} cm</span>@endif
             </div>
             @if($c->goal_note)<div class="small text-secondary mb-2">🎯 {{ $c->goal_note }}</div>@endif
             <div class="row g-2 mb-3">
