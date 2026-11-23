@@ -93,6 +93,9 @@ body { min-height: 100vh; }
 .set-row label { display: block; font-size: .68rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px; }
 .set-row .form-control { min-height: 46px; padding: .4rem .3rem; text-align: center; font-weight: 800; font-size: 1.05rem; color: var(--pink-dark); background: #fff; }
 .set-row .set-remove { min-height: 46px; padding: 0; }
+/* Gerakan yang dilewati saat live session: meredup dan tidak ikut disimpan */
+.ex-row.ex-skipped { opacity: .5; }
+.ex-row.ex-skipped .skip-ex-btn { opacity: 1; }
 .live-sticky-cta { position: sticky; bottom: -24px; background: #fff; padding: 10px 0 4px; }
 
 .info-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 16px; padding: 12px 14px; font-size: .85rem; line-height: 1.45; }

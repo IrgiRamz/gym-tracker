@@ -9,9 +9,32 @@ use Throwable;
 
 class AiWorkoutService
 {
-    /** Jumlah gerakan per sesi (sudah termasuk pemanasan) */
-    private const MIN_EXERCISES = 4;
-    private const MAX_EXERCISES = 5;
+    /**
+     * Jumlah gerakan UTAMA per sesi: minimal 5, atau 6 bila fokusnya hanya
+     * "Seluruh Tubuh" dan frekuensinya 1x/minggu (satu-satunya sesi minggu itu harus padat).
+     * Pemanasan (jalan cepat, treadmill, sepeda statis, peregangan) BUKAN gerakan:
+     * tidak dihitung dan tidak dimasukkan ke daftar gerakan sama sekali.
+     */
+    private function minExercises(array $client, int $freq): int
+    {
+        return ($this->focusList($client) === ['Seluruh Tubuh'] && $freq <= 1) ? 6 : 5;
+    }
+
+    private function maxExercises(array $client, int $freq): int
+    {
+        return $this->minExercises($client, $freq) + 1;
+    }
+
+    /** Nama gerakan pemanasan yang tidak boleh masuk daftar gerakan (jaga-jaga dari hasil AI). */
+    private function isWarmup(string $name): bool
+    {
+        foreach (['pemanasan', 'jalan cepat', 'treadmill', 'sepeda statis', 'elliptical'] as $kw) {
+            if (stripos($name, $kw) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * Hasilkan program latihan: array of ['day_label' => string, 'exercises' => [...]].
@@ -28,6 +51,22 @@ class AiWorkoutService
             try {
                 $programs = $this->callGemini($client, $equipments, $freq);
                 if ($programs) {
+                    // Jaminan jumlah minimal: sesi AI yang gerakannya kurang dari minimal
+                    // dilengkapi dari template fallback (nama yang belum ada).
+                    $fallback = $this->fallback($client, $equipments, $freq);
+                    $min = $this->minExercises($client, $freq);
+                    foreach ($programs as $i => $day) {
+                        $names = array_column($day['exercises'], 'name');
+                        foreach (($fallback[$i]['exercises'] ?? []) as $f) {
+                            if (count($programs[$i]['exercises']) >= $min) {
+                                break;
+                            }
+                            if (! in_array($f['name'], $names, true)) {
+                                $programs[$i]['exercises'][] = $f;
+                                $names[] = $f['name'];
+                            }
+                        }
+                    }
                     return ['programs' => $programs, 'source' => 'ai'];
                 }
             } catch (Throwable $e) {
@@ -49,13 +88,15 @@ class AiWorkoutService
     private function callGemini(array $client, array $equipments, int $freq): ?array
     {
         $focus = $this->focusList($client);
+        $min = $this->minExercises($client, $freq);
+        $max = $this->maxExercises($client, $freq);
 
         $system = "Kamu adalah personal trainer profesional yang ramah. Buat program latihan 1 siklus dalam Bahasa Indonesia. "
             . "WAJIB hanya memakai alat dari daftar berikut (atau 'Tanpa Alat' untuk gerakan bodyweight): "
             . implode('; ', $equipments) . '. '
             . "Balas HANYA JSON array berisi tepat {$freq} sesi. Format tiap sesi: "
             . '{"day_label":"Sesi A - Bokong (Glutes)","exercises":[{"name":"...","equipment":"(nama persis dari daftar alat atau Tanpa Alat)","sets_reps":"3 x 12","target_kg":0,"tip":"tips singkat"}]}. '
-            . 'Isi MINIMAL 4 dan MAKSIMAL 5 gerakan per sesi (jangan lebih dari 5), urutan dari pemanasan ringan ke gerakan utama. target_kg berupa angka (0 jika bodyweight), konservatif untuk pemula. '
+            . "Isi MINIMAL {$min} dan MAKSIMAL {$max} gerakan utama per sesi. Pemanasan (jalan cepat, treadmill, sepeda statis, elliptical, peregangan) BUKAN gerakan: jangan masukkan ke daftar exercises sama sekali. Urutkan dari gerakan utama ke gerakan pendukung. target_kg berupa angka (0 jika bodyweight), konservatif untuk pemula. "
             . 'Klien bisa memiliki BEBERAPA fokus bagian tubuh. Bagi porsi latihan secara seimbang di seluruh sesi mingguan sehingga semua area fokus tertangani '
             . '(contoh: Sesi A fokus Bokong, Sesi B fokus Punggung). Cantumkan area fokus utama tiap sesi pada day_label. '
             . "Jika fokusnya 'Seluruh Tubuh', buat tiap sesi menyeluruh dengan variasi gerakan.";
@@ -92,8 +133,8 @@ class AiWorkoutService
         foreach (array_slice($data, 0, $freq) as $i => $day) {
             $ex = [];
             foreach (($day['exercises'] ?? []) as $e) {
-                if (empty($e['name'])) {
-                    continue;
+                if (empty($e['name']) || $this->isWarmup((string) $e['name'])) {
+                    continue; // nama kosong atau gerakan pemanasan tidak dihitung sebagai gerakan
                 }
                 $ex[] = [
                     'name' => (string) $e['name'],
@@ -103,7 +144,7 @@ class AiWorkoutService
                     'tip' => (string) ($e['tip'] ?? ''),
                 ];
             }
-            $ex = array_slice($ex, 0, self::MAX_EXERCISES); // jaga-jaga jika AI membuat lebih dari 5
+            $ex = array_slice($ex, 0, $this->maxExercises($client, $freq)); // jaga-jaga jika AI membuat lebih dari maksimal
             if ($ex) {
                 $programs[] = [
                     'day_label' => (string) ($day['day_label'] ?? 'Sesi ' . chr(65 + $i)),
@@ -227,19 +268,7 @@ class AiWorkoutService
             return $out;
         }, $lib);
 
-        // Pemanasan kardio: treadmill, lalu sepeda, lalu elliptical; jika tidak ada pemanasan dinamis
-        $warmup = function () use ($find, $ex) {
-            if ($find('treadmill')) {
-                return $ex('Jalan Cepat / Pemanasan', 'treadmill', '1 x 5 menit', 0, 'Pemanasan santai sampai badan hangat.');
-            }
-            if ($find('bike')) {
-                return $ex('Sepeda Statis / Pemanasan', 'bike', '1 x 5 menit', 0, 'Kayuh santai sampai badan hangat.');
-            }
-            if ($find('elliptical')) {
-                return $ex('Elliptical / Pemanasan', 'elliptical', '1 x 5 menit', 0, 'Gerak santai sampai badan hangat.');
-            }
-            return $ex('Pemanasan Dinamis', null, '2 x 10', 0, 'Putar bahu, pinggul, dan lutut pelan-pelan.');
-        };
+        // Catatan: pemanasan SENGAJA tidak dimasukkan ke daftar gerakan (bukan gerakan, tidak dihitung).
 
         // Bagi area fokus ke tiap sesi secara bergiliran
         $n = count($focus);
@@ -254,27 +283,29 @@ class AiWorkoutService
             }
         }
 
+        $min = $this->minExercises($client, $freq);
+        $max = $this->maxExercises($client, $freq);
         $programs = [];
         foreach ($assign as $s => $areas) {
-            // Total 5 gerakan: 1 pemanasan + 4 gerakan utama dibagi rata ke area fokus sesi ini
-            $mainSlots = self::MAX_EXERCISES - 1;
+            // Semua slot adalah gerakan utama (tanpa pemanasan), dibagi rata ke area fokus sesi ini
+            $mainSlots = $min;
             $areasUsed = array_slice($areas, 0, $mainSlots);
-            $base4 = intdiv($mainSlots, count($areasUsed));
+            $baseN = intdiv($mainSlots, count($areasUsed));
             $extra = $mainSlots % count($areasUsed);
             // Variasi gerakan: sesi berikutnya yang memakai area sama mulai dari gerakan berbeda
             $rot = intdiv($s, max(1, $n)) % 2;
-            $exercises = [$warmup()];
+            $exercises = [];
             foreach ($areasUsed as $i => $a) {
                 $list = $lib[$a] ?? $lib['Seluruh Tubuh'];
                 if ($rot && count($list) > 1) {
                     $list = array_merge(array_slice($list, 1), array_slice($list, 0, 1));
                 }
-                $exercises = array_merge($exercises, array_slice($list, 0, $base4 + ($i < $extra ? 1 : 0)));
+                $exercises = array_merge($exercises, array_slice($list, 0, $baseN + ($i < $extra ? 1 : 0)));
             }
             $exercises = array_values(array_filter($exercises));
-            // Jika ada gerakan yang terlewat (alat tidak ada), lengkapi sampai minimal 4
+            // Jika ada gerakan yang terlewat (alat tidak ada), lengkapi sampai jumlah minimal
             foreach (array_merge($lib['Perut & Pinggang'], $lib['Seluruh Tubuh']) as $filler) {
-                if (count($exercises) >= self::MIN_EXERCISES) {
+                if (count($exercises) >= $min) {
                     break;
                 }
                 if (! in_array($filler['name'], array_column($exercises, 'name'), true)) {
@@ -283,7 +314,7 @@ class AiWorkoutService
             }
             $programs[] = [
                 'day_label' => 'Sesi ' . chr(65 + $s) . ' - ' . implode(' & ', $areasUsed),
-                'exercises' => array_slice($exercises, 0, self::MAX_EXERCISES),
+                'exercises' => array_slice($exercises, 0, $max),
             ];
         }
         return $programs;

@@ -288,6 +288,7 @@
                     ${Array.from({ length: Math.min(Math.max(x.default_sets || 3, 1), 8) }, () => setRowHtml(x.default_reps ?? '', x.target_kg || 0)).join('')}
                 </div>
                 <button type="button" class="btn btn-soft btn-sm w-100 mt-2 add-set-btn"><i class="bi bi-plus-circle"></i> Tambah Set</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2 skip-ex-btn"><i class="bi bi-skip-forward"></i> Lewati Gerakan Ini</button>
                 <div class="tip mt-2">💡 ${esc(x.tip)}</div>
             </div>`).join('') || '<div class="text-secondary text-center py-3">Jadwal ini belum punya program gerakan.</div>';
         panel.querySelectorAll('.ex-row').forEach(renumberSets);
@@ -337,6 +338,18 @@
     // Tambah/kurang baris set per gerakan, fleksibel mengikuti kekuatan klien hari itu.
     // Baris baru menyalin repetisi & beban baris terakhir; minimal tersisa 1 set.
     document.getElementById('liveExercises').addEventListener('click', e => {
+        const sk = e.target.closest('.skip-ex-btn');
+        if (sk) {
+            // Lewati gerakan: kartu meredup, input mati, dan gerakan tidak ikut disimpan saat sesi selesai
+            // (mis. klien hanya kuat 4 dari 5-6 gerakan hari itu).
+            const card = sk.closest('.ex-row');
+            const on = card.classList.toggle('ex-skipped');
+            card.querySelectorAll('input').forEach(i => i.disabled = on);
+            sk.innerHTML = on
+                ? '<i class="bi bi-arrow-counterclockwise"></i> Batal Lewati (gerakan tidak disimpan)'
+                : '<i class="bi bi-skip-forward"></i> Lewati Gerakan Ini';
+            return;
+        }
         const add = e.target.closest('.add-set-btn');
         if (add) {
             const card = add.closest('.ex-row'), rows = card.querySelector('.set-rows');
@@ -367,7 +380,9 @@
     document.getElementById('finishBtn').onclick = async function () {
         if (!live || !(await confirmModal({ title: 'Selesaikan sesi?', text: 'Sesi akan ditutup, paket sesi klien berkurang 1, dan laporan dikirim ke WhatsApp klien.', yes: 'Ya, selesai & kirim', icon: '💖' }))) return;
         const btn = this; btn.disabled = true; btn.textContent = 'Menyimpan...';
-        const performance = [...document.querySelectorAll('#liveExercises .ex-row')].map(r => {
+        const performance = [...document.querySelectorAll('#liveExercises .ex-row')]
+            .filter(r => !r.classList.contains('ex-skipped')) // gerakan yang dilewati tidak disimpan
+            .map(r => {
             // Detail per set: tiap baris set menyumbang {reps, kg} sendiri.
             const detail = [...r.querySelectorAll('.set-row')].map(sr => ({
                 reps: sr.querySelector('.set-reps').value.trim() || null,
@@ -382,7 +397,9 @@
                 actual_kg: detail.reduce((m, d) => Math.max(m, d.kg), 0), // beban terberat (top set)
                 sets_detail: detail,
             };
-        });
+        })
+            // Gerakan yang dikosongkan total (semua set tanpa repetisi dan tanpa beban) juga tidak disimpan.
+            .filter(p => p.sets_detail.some(d => d.reps || d.kg > 0));
         try {
             const res = await api(`/jadwal/${live.id}/selesai`, 'POST', { performance, coach_note: document.getElementById('liveNote').value });
             const cl = CLIENTS.find(x => x.id == res.schedule.client_id);

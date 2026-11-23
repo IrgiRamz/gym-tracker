@@ -99,7 +99,7 @@ Bentuk elemen `exercises_json`:
 ```json
 { "name": "Hip Thrust", "equipment": "Barbell & Plate", "sets_reps": "3 x 12", "target_kg": 12.0, "tip": "Remas bokong di puncak gerakan." }
 ```
-`equipment` bernilai nama alat dari tabel `equipments` atau `"Tanpa Alat"`. Jumlah gerakan per sesi: **4–5** (sudah termasuk pemanasan).
+`equipment` bernilai nama alat dari tabel `equipments` atau `"Tanpa Alat"`. Jumlah gerakan per sesi: **5–6 gerakan utama** (6–7 bila fokus hanya "Seluruh Tubuh" dan frekuensi 1x/minggu). Pemanasan (jalan cepat, treadmill, sepeda statis, peregangan) **bukan** gerakan: tidak dihitung dan tidak dimasukkan ke daftar.
 
 ### `schedules`
 | Kolom | Tipe | Catatan |
