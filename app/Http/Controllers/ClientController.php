@@ -258,20 +258,60 @@ class ClientController extends Controller
         ]);
     }
 
-    /** Ganti SATU gerakan dalam program dengan gerakan alternatif pilihan pelatih (bukan generate ulang). */
-    public function swapExercise(Request $request, WorkoutProgram $program, int $index, AiWorkoutService $ai): JsonResponse
+    /** Buat satu gerakan pengganti BARU dengan AI untuk satu posisi gerakan (JSON, untuk modal Ganti Gerakan). */
+    public function exerciseAlternativeAi(Request $request, WorkoutProgram $program, int $index, AiWorkoutService $ai): JsonResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:100']]);
+        $data = $request->validate(['exclude' => ['nullable', 'array', 'max:20'], 'exclude.*' => ['string', 'max:100']]);
         $program->loadMissing('client');
         $exercises = $program->exercises_json ?? [];
         if (! isset($exercises[$index])) {
             return response()->json(['message' => 'Gerakan tidak ditemukan di program ini.'], 404);
         }
-        $alt = collect($ai->alternativesFor($program->client, $program->day_label, $exercises, $index))
-            ->firstWhere('name', $data['name']);
-        if (! $alt) {
-            return response()->json(['message' => 'Gerakan pengganti itu tidak tersedia untuk gerakan ini.'], 422);
+        $new = $ai->generateReplacement($program->client, $program->day_label, $exercises, $index, $data['exclude'] ?? []);
+        if (! $new) {
+            return response()->json(['message' => 'AI belum bisa membuat gerakan baru saat ini. Coba lagi sebentar ya.'], 422);
         }
+        return response()->json(['exercise' => $new]);
+    }
+
+    /** Ganti SATU gerakan dalam program dengan gerakan lain (bukan generate ulang). */
+    public function swapExercise(Request $request, WorkoutProgram $program, int $index, AiWorkoutService $ai): JsonResponse
+    {
+        $program->loadMissing('client');
+        $exercises = $program->exercises_json ?? [];
+        if (! isset($exercises[$index])) {
+            return response()->json(['message' => 'Gerakan tidak ditemukan di program ini.'], 404);
+        }
+
+        if ($request->has('exercise')) {
+            // Pengganti hasil generate AI: divalidasi ulang di server (wajib beralat, alatnya tersedia, tidak dobel di sesi).
+            $data = $request->validate([
+                'exercise.name' => ['required', 'string', 'max:100'],
+                'exercise.equipment' => ['required', 'string', 'max:100'],
+                'exercise.sets_reps' => ['required', 'string', 'max:30'],
+                'exercise.target_kg' => ['nullable', 'numeric', 'min:0', 'max:500'],
+                'exercise.tip' => ['nullable', 'string', 'max:300'],
+            ]);
+            $alt = $ai->validateReplacement($data['exercise']);
+            if (! $alt) {
+                return response()->json(['message' => 'Gerakan pengganti itu tidak valid (harus memakai alat yang tersedia).'], 422);
+            }
+            $newKey = ExerciseMedia::keyFor($alt['name']);
+            foreach ($exercises as $i => $x) {
+                if ($i !== $index && ExerciseMedia::keyFor((string) ($x['name'] ?? '')) === $newKey) {
+                    return response()->json(['message' => 'Gerakan itu sudah ada di sesi ini.'], 422);
+                }
+            }
+        } else {
+            // Pengganti dari pustaka: nama harus ada di daftar alternatif resmi gerakan ini.
+            $data = $request->validate(['name' => ['required', 'string', 'max:100']]);
+            $alt = collect($ai->alternativesFor($program->client, $program->day_label, $exercises, $index))
+                ->firstWhere('name', $data['name']);
+            if (! $alt) {
+                return response()->json(['message' => 'Gerakan pengganti itu tidak tersedia untuk gerakan ini.'], 422);
+            }
+        }
+
         $old = $exercises[$index]['name'];
         $exercises[$index] = $alt;
         $exercises = array_values($exercises);

@@ -367,10 +367,49 @@ class AiWorkoutService
     }
 
     /**
+     * Area otot sebuah gerakan, ditebak dari NAMA gerakannya (bukan dari daftar asal):
+     * Squat selalu kaki walau muncul di sesi Seluruh Tubuh, Chest Press selalu dada.
+     * Urutan aturan penting: yang spesifik didahulukan (romanian deadlift -> bokong
+     * sebelum deadlift -> punggung; leg curl -> kaki sebelum curl -> lengan).
+     * Cadangan terakhir: nama persis di pustaka, lalu label sesi, lalu Seluruh Tubuh.
+     */
+    private function muscleAreaFor(string $name, string $dayLabel, array $lib): string
+    {
+        $n = ExerciseMedia::keyFor($name);
+        $rules = [
+            'Bokong (Glutes)' => ['hip thrust', 'glute', 'kickback', 'abduction', 'romanian deadlift', 'donkey kick'],
+            'Kaki & Paha' => ['leg curl', 'leg extension', 'leg press', 'squat', 'lunge', 'calf', 'step up', 'hack'],
+            'Dada (Chest)' => ['chest press', 'bench press', 'pec', 'fly', 'dip'],
+            'Punggung (Back)' => ['pulldown', 'pull up', 'pullup', 'row', 'deadlift', 'pullover', 'back extension'],
+            'Perut & Pinggang' => ['crunch', 'twist', 'woodchopper', 'leg raise', 'sit up', 'plank'],
+            'Lengan & Bahu' => ['shoulder press', 'lateral raise', 'bicep', 'tricep', 'curl', 'front raise', 'rear delt'],
+        ];
+        foreach ($rules as $area => $keywords) {
+            foreach ($keywords as $kw) {
+                if (str_contains($n, $kw)) {
+                    return $area;
+                }
+            }
+        }
+        foreach ($lib as $a => $items) {
+            foreach ($items as $it) {
+                if (ExerciseMedia::keyFor($it['name']) === $n) {
+                    return $a;
+                }
+            }
+        }
+        foreach (array_keys($lib) as $a) {
+            if ($a !== 'Seluruh Tubuh' && stripos($dayLabel, $a) !== false) {
+                return $a;
+            }
+        }
+        return 'Seluruh Tubuh';
+    }
+
+    /**
      * Gerakan alternatif untuk mengganti SATU gerakan dalam program (fitur Ganti Gerakan):
-     * gerakan lain dari area otot yang sama, hanya yang beralat dan alatnya tersedia,
-     * dan belum dipakai di sesi yang sama. Area ditentukan dari nama gerakan di pustaka;
-     * bila nama tidak dikenal (gerakan khas AI), ditebak dari label sesi.
+     * gerakan lain dari area otot yang sama (dari nama gerakannya), hanya yang beralat
+     * dan alatnya tersedia, dan belum dipakai di sesi yang sama.
      */
     public function alternativesFor(Client $client, string $dayLabel, array $exercises, int $index): array
     {
@@ -379,31 +418,101 @@ class AiWorkoutService
         }
         $equipments = Equipment::where('is_available', true)->pluck('name')->all();
         $lib = $this->buildLibrary($equipments, $client->gender === 'Wanita');
-
-        $curKey = ExerciseMedia::keyFor((string) ($exercises[$index]['name'] ?? ''));
-        $area = null;
-        foreach ($lib as $a => $items) {
-            foreach ($items as $it) {
-                if (ExerciseMedia::keyFor($it['name']) === $curKey) {
-                    $area = $a;
-                    break 2;
-                }
-            }
-        }
-        if (! $area) {
-            foreach (array_keys($lib) as $a) {
-                if (stripos($dayLabel, $a) !== false) {
-                    $area = $a;
-                    break;
-                }
-            }
-        }
-        $area ??= 'Seluruh Tubuh';
+        $area = $this->muscleAreaFor((string) ($exercises[$index]['name'] ?? ''), $dayLabel, $lib);
 
         $used = array_map(fn ($x) => ExerciseMedia::keyFor((string) ($x['name'] ?? '')), $exercises);
         return array_values(array_filter(
             $lib[$area] ?? [],
             fn ($it) => ! in_array(ExerciseMedia::keyFor($it['name']), $used, true)
         ));
+    }
+
+    /**
+     * Buat SATU gerakan pengganti BARU memakai AI, khusus untuk satu posisi gerakan:
+     * otot yang sama dengan gerakan yang diganti, memakai alat yang tersedia, dan
+     * berbeda dari semua gerakan di sesi + nama-nama yang dikecualikan (yang sudah
+     * ditawarkan). Null bila AI tidak tersedia atau hasilnya tidak lolos saringan.
+     */
+    public function generateReplacement(Client $client, string $dayLabel, array $exercises, int $index, array $excludeNames = []): ?array
+    {
+        if (! isset($exercises[$index]) || ! config('services.gemini.key')) {
+            return null;
+        }
+        $equipments = Equipment::where('is_available', true)->pluck('name')->all();
+        if (! $equipments) {
+            return null;
+        }
+        $lib = $this->buildLibrary($equipments, $client->gender === 'Wanita');
+        $current = $exercises[$index];
+        $area = $this->muscleAreaFor((string) ($current['name'] ?? ''), $dayLabel, $lib);
+        $avoid = array_values(array_unique(array_merge(
+            array_map(fn ($x) => (string) ($x['name'] ?? ''), $exercises),
+            $excludeNames
+        )));
+
+        $system = 'Kamu adalah personal trainer profesional. Buat TEPAT SATU gerakan latihan pengganti dalam Bahasa Indonesia. '
+            . 'WAJIB memakai satu alat dari daftar berikut: ' . implode('; ', $equipments) . '. '
+            . 'Balas HANYA JSON object: {"name":"...","equipment":"(nama persis dari daftar alat)","sets_reps":"3 x 12","target_kg":0,"tip":"tips singkat"}. '
+            . 'Gerakan bodyweight/tanpa alat DILARANG. Pemanasan BUKAN gerakan. target_kg berupa angka perkiraan beban alat, konservatif sesuai profil klien.';
+        $user = sprintf(
+            'Klien: %s, gender %s, umur %s tahun, berat %s kg. Gerakan yang diganti: %s (alat: %s). Buat gerakan LAIN yang melatih otot yang sama (area: %s); harus gerakan yang benar-benar berbeda, bukan gerakan yang sama dengan nama lain. Jangan pakai gerakan ini: %s.',
+            $client->name, $client->gender, $client->age ?? '-', $client->weight_kg,
+            $current['name'] ?? '-', $current['equipment'] ?? '-', $area, implode(', ', $avoid)
+        );
+
+        try {
+            $model = config('services.gemini.model');
+            $res = Http::timeout(40)->withHeaders(['x-goog-api-key' => config('services.gemini.key')])
+                ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
+                    'systemInstruction' => ['parts' => [['text' => $system]]],
+                    'contents' => [['role' => 'user', 'parts' => [['text' => $user]]]],
+                    'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0.9],
+                ]);
+            if (! $res->successful()) {
+                throw new \RuntimeException('HTTP ' . $res->status());
+            }
+            $e = json_decode((string) $res->json('candidates.0.content.parts.0.text'), true);
+            if (! is_array($e)) {
+                return null;
+            }
+            $valid = $this->validateReplacement($e);
+            if (! $valid) {
+                return null;
+            }
+            $newKey = ExerciseMedia::keyFor($valid['name']);
+            foreach ($avoid as $a) {
+                if (ExerciseMedia::keyFor($a) === $newKey) {
+                    return null; // dobel dengan gerakan di sesi / yang sudah ditawarkan
+                }
+            }
+            return $valid;
+        } catch (Throwable $e) {
+            Log::warning('Gemini gagal membuat gerakan pengganti: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Validasi gerakan pengganti dari luar (pilihan pustaka tidak lewat sini; ini untuk
+     * hasil generate AI yang dipilih pelatih): wajib beralat, alatnya ada di daftar,
+     * bukan pemanasan/bodyweight. Mengembalikan gerakan dengan nama alat resmi.
+     */
+    public function validateReplacement(array $e): ?array
+    {
+        if (empty($e['name']) || $this->isWarmup((string) $e['name'])) {
+            return null;
+        }
+        $equipments = Equipment::where('is_available', true)->pluck('name')->all();
+        $eq = $this->matchedEquipment($e, $equipments);
+        if ($eq === null) {
+            return null;
+        }
+        return [
+            'name' => (string) $e['name'],
+            'equipment' => $eq,
+            'sets_reps' => (string) ($e['sets_reps'] ?? '3 x 12'),
+            'target_kg' => (float) ($e['target_kg'] ?? 0),
+            'tip' => (string) ($e['tip'] ?? ''),
+        ];
     }
 }

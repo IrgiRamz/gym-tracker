@@ -32,6 +32,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/klien/{client}/sesi', [ClientController::class, 'addSessions'])->name('klien.sessions');
     Route::delete('/klien/{client}', [ClientController::class, 'destroy'])->name('klien.destroy');
     Route::get('/program/{program}/gerakan/{index}/alternatif', [ClientController::class, 'exerciseAlternatives'])->name('program.alternatif');
+    Route::post('/program/{program}/gerakan/{index}/alternatif-ai', [ClientController::class, 'exerciseAlternativeAi'])->name('program.alternatifAi');
     Route::patch('/program/{program}/gerakan/{index}', [ClientController::class, 'swapExercise'])->name('program.ganti');
 
     Route::get('/alat', [EquipmentController::class, 'index'])->name('alat.index');

@@ -593,21 +593,49 @@
                     <span class="small text-secondary">${escP(a.sets_reps)}${a.target_kg > 0 ? ' &middot; ' + escP(a.target_kg) + ' kg' : ''} &middot; ${escP(a.equipment)}</span>
                 </button>`).join('')
                 : '<div class="text-center text-secondary py-3">Belum ada gerakan alternatif lain untuk otot ini dengan alat yang tersedia.</div>';
+            swapCtx.shown = [cur?.name, ...d.alternatives.map(a => a.name)].filter(Boolean);
+            swapCtx.aiByName = {};
+            html += `<div class="mt-3"><div data-swap-ai-list></div>
+                <button type="button" class="btn btn-pink w-100" data-swap-ai>✨ Buatkan gerakan baru dengan AI</button>
+                <div class="small text-secondary mt-1 text-center">AI membuat satu gerakan baru khusus posisi ini: otot yang sama, alat yang tersedia, beda dari yang sudah ada. Ketuk lagi untuk variasi lain.</div></div>`;
             body.innerHTML = html;
         } catch (err) {
             body.innerHTML = '<div class="text-center text-danger py-4">Pengganti belum bisa dimuat. Coba lagi ya.</div>';
         }
     }
     document.getElementById('swapExerciseBody').addEventListener('click', async e => {
-        const b = e.target.closest('[data-swap-pick]'); if (!b || !swapCtx) return;
+        const aiBtn = e.target.closest('[data-swap-ai]');
+        if (aiBtn && swapCtx) {
+            aiBtn.disabled = true;
+            const label = aiBtn.innerHTML;
+            aiBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> AI sedang membuat gerakan...';
+            try {
+                const d = await api(`/program/${swapCtx.programId}/gerakan/${swapCtx.index}/alternatif-ai`, 'POST', { exclude: swapCtx.shown || [] });
+                const a = d.exercise;
+                (swapCtx.aiByName ??= {})[a.name] = a;
+                (swapCtx.shown ??= []).push(a.name);
+                document.querySelector('#swapExerciseBody [data-swap-ai-list]').insertAdjacentHTML('afterbegin', `
+                <button type="button" class="btn btn-soft w-100 text-start mb-2" data-swap-pick-ai="${escP(a.name)}">
+                    <span class="fw-bold d-block">${escP(a.name)} <span class="badge rounded-pill" style="background:var(--pink)">Baru dari AI</span></span>
+                    <span class="small text-secondary">${escP(a.sets_reps)}${a.target_kg > 0 ? ' &middot; ' + escP(a.target_kg) + ' kg' : ''} &middot; ${escP(a.equipment)}</span>
+                </button>`);
+            } catch (err) { toast(err.message || 'AI belum bisa membuat gerakan baru.', 'danger'); }
+            aiBtn.disabled = false; aiBtn.innerHTML = label;
+            return;
+        }
+        const bAi = e.target.closest('[data-swap-pick-ai]');
+        const b = e.target.closest('[data-swap-pick]');
+        if ((!b && !bAi) || !swapCtx) return;
         const { programId, index, onDone } = swapCtx;
-        b.disabled = true;
+        const btn = bAi || b;
+        btn.disabled = true;
         try {
-            const res = await api(`/program/${programId}/gerakan/${index}`, 'PATCH', { name: b.dataset.swapPick });
+            const payload = bAi ? { exercise: swapCtx.aiByName[bAi.dataset.swapPickAi] } : { name: b.dataset.swapPick };
+            const res = await api(`/program/${programId}/gerakan/${index}`, 'PATCH', payload);
             bootstrap.Modal.getOrCreateInstance(document.getElementById('swapExerciseModal')).hide();
             toast(res.message);
             if (onDone) onDone(res.exercise, res.exercises);
-        } catch (err) { toast(err.message || 'Gagal mengganti gerakan.', 'danger'); b.disabled = false; }
+        } catch (err) { toast(err.message || 'Gagal mengganti gerakan.', 'danger'); btn.disabled = false; }
         swapCtx = null;
     });
 
