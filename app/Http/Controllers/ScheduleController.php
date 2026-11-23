@@ -28,6 +28,7 @@ class ScheduleController extends Controller
             'started_at' => $s->started_at?->toIso8601String(),
             'duration_minutes' => $s->duration_minutes,
             'program_label' => $s->program?->day_label,
+            'program_id' => $s->workout_program_id,
             // Tambahkan nilai default set & repetisi (dipecah dari teks target "3 x 12") untuk input live session
             'exercises' => collect($s->program?->exercises_json ?? [])->map(function ($x) {
                 [$sets, $reps] = Schedule::parseSetsReps($x['sets_reps'] ?? '');

@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Equipment;
 use App\Models\ExerciseMedia;
+use App\Models\WorkoutProgram;
 use App\Services\AiWorkoutService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -243,5 +245,41 @@ class ClientController extends Controller
     {
         $client->delete();
         return back()->with('success', 'Data klien sudah dihapus.');
+    }
+
+    /** Daftar gerakan pengganti satu area otot untuk satu gerakan dalam program (JSON, untuk modal Ganti Gerakan). */
+    public function exerciseAlternatives(WorkoutProgram $program, int $index, AiWorkoutService $ai): JsonResponse
+    {
+        $program->loadMissing('client');
+        $exercises = $program->exercises_json ?? [];
+        return response()->json([
+            'current' => $exercises[$index] ?? null,
+            'alternatives' => $ai->alternativesFor($program->client, $program->day_label, $exercises, $index),
+        ]);
+    }
+
+    /** Ganti SATU gerakan dalam program dengan gerakan alternatif pilihan pelatih (bukan generate ulang). */
+    public function swapExercise(Request $request, WorkoutProgram $program, int $index, AiWorkoutService $ai): JsonResponse
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'max:100']]);
+        $program->loadMissing('client');
+        $exercises = $program->exercises_json ?? [];
+        if (! isset($exercises[$index])) {
+            return response()->json(['message' => 'Gerakan tidak ditemukan di program ini.'], 404);
+        }
+        $alt = collect($ai->alternativesFor($program->client, $program->day_label, $exercises, $index))
+            ->firstWhere('name', $data['name']);
+        if (! $alt) {
+            return response()->json(['message' => 'Gerakan pengganti itu tidak tersedia untuk gerakan ini.'], 422);
+        }
+        $old = $exercises[$index]['name'];
+        $exercises[$index] = $alt;
+        $exercises = array_values($exercises);
+        $program->update(['exercises_json' => $exercises]);
+        return response()->json([
+            'message' => "Gerakan {$old} diganti jadi {$alt['name']} ✨",
+            'exercise' => $alt,
+            'exercises' => $exercises,
+        ]);
     }
 }

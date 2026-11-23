@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Client;
 use App\Models\Equipment;
+use App\Models\ExerciseMedia;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -196,14 +198,11 @@ class AiWorkoutService
     }
 
     /**
-     * Template rapi yang menyesuaikan dengan alat yang tersedia dan membagi
-     * beberapa area fokus secara bergiliran ke seluruh sesi mingguan.
+     * Pustaka gerakan per area fokus: hanya gerakan beralat yang alatnya tersedia,
+     * gerakan kembar dalam satu area dibuang. Dipakai template fallback dan fitur Ganti Gerakan.
      */
-    public function fallback(array $client, array $equipments, int $freq): array
+    private function buildLibrary(array $equipments, bool $wanita): array
     {
-        $freq = max(1, $freq);
-        $focus = $this->focusList($client);
-        $wanita = ($client['gender'] ?? '') === 'Wanita';
         $base = $wanita ? 0.6 : 1.0; // pengali beban awal
 
         // Cari alat pertama yang namanya memuat kata kunci. $kw bisa daftar kata kunci (dicoba berurutan).
@@ -300,6 +299,21 @@ class AiWorkoutService
             return $out;
         }, $lib);
 
+        return $lib;
+    }
+
+    /**
+     * Template rapi yang menyesuaikan dengan alat yang tersedia dan membagi
+     * beberapa area fokus secara bergiliran ke seluruh sesi mingguan.
+     */
+    public function fallback(array $client, array $equipments, int $freq): array
+    {
+        $freq = max(1, $freq);
+        $focus = $this->focusList($client);
+        $wanita = ($client['gender'] ?? '') === 'Wanita';
+
+        $lib = $this->buildLibrary($equipments, $wanita);
+
         // Catatan: pemanasan SENGAJA tidak dimasukkan ke daftar gerakan (bukan gerakan, tidak dihitung).
 
         // Bagi area fokus ke tiap sesi secara bergiliran
@@ -350,5 +364,46 @@ class AiWorkoutService
             ];
         }
         return $programs;
+    }
+
+    /**
+     * Gerakan alternatif untuk mengganti SATU gerakan dalam program (fitur Ganti Gerakan):
+     * gerakan lain dari area otot yang sama, hanya yang beralat dan alatnya tersedia,
+     * dan belum dipakai di sesi yang sama. Area ditentukan dari nama gerakan di pustaka;
+     * bila nama tidak dikenal (gerakan khas AI), ditebak dari label sesi.
+     */
+    public function alternativesFor(Client $client, string $dayLabel, array $exercises, int $index): array
+    {
+        if (! isset($exercises[$index])) {
+            return [];
+        }
+        $equipments = Equipment::where('is_available', true)->pluck('name')->all();
+        $lib = $this->buildLibrary($equipments, $client->gender === 'Wanita');
+
+        $curKey = ExerciseMedia::keyFor((string) ($exercises[$index]['name'] ?? ''));
+        $area = null;
+        foreach ($lib as $a => $items) {
+            foreach ($items as $it) {
+                if (ExerciseMedia::keyFor($it['name']) === $curKey) {
+                    $area = $a;
+                    break 2;
+                }
+            }
+        }
+        if (! $area) {
+            foreach (array_keys($lib) as $a) {
+                if (stripos($dayLabel, $a) !== false) {
+                    $area = $a;
+                    break;
+                }
+            }
+        }
+        $area ??= 'Seluruh Tubuh';
+
+        $used = array_map(fn ($x) => ExerciseMedia::keyFor((string) ($x['name'] ?? '')), $exercises);
+        return array_values(array_filter(
+            $lib[$area] ?? [],
+            fn ($it) => ! in_array(ExerciseMedia::keyFor($it['name']), $used, true)
+        ));
     }
 }

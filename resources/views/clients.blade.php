@@ -262,6 +262,16 @@
     </div>
 </div>
 
+{{-- Ganti satu gerakan dengan gerakan lain satu area otot --}}
+<div class="modal fade" id="swapExerciseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="swapExerciseTitle">Ganti Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body" id="swapExerciseBody"></div>
+        </div>
+    </div>
+</div>
+
 {{-- Lihat foto alat (dari modal program) --}}
 <div class="modal fade" id="equipmentImageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
@@ -538,15 +548,67 @@
     });
 
     // --- Modal program ---
+    let programData = null, programSourceBtn = null;
+    const escP = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+    function renderPrograms() {
+        document.getElementById('programBody').innerHTML = programData.programs.map(p => `
+            <div class="mb-3"><div class="fw-bold mb-2" style="color:var(--pink-dark)">${escP(p.day_label)}</div>
+            ${p.exercises_json.map((x, xi) => `<div class="ex-row"><button type="button" class="btn btn-soft btn-sm float-end ms-1" title="Ganti gerakan ini dengan gerakan lain satu otot" data-swap-ex data-program="${p.id}" data-index="${xi}"><i class="bi bi-arrow-repeat"></i> Ganti</button>${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm float-end ms-1" title="Lihat contoh gerakan" data-mv-play="${escP(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm float-end" title="Lihat foto alat" data-eq-photo="${escP(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}<div class="fw-bold">${escP(x.name)}</div>
+                <div class="small">${escP(x.sets_reps)} &middot; ${x.target_kg > 0 ? escP(x.target_kg) + ' kg' : 'berat badan'} &middot; <span class="text-secondary">${escP(x.equipment)}</span></div>
+                <div class="tip">💡 ${escP(x.tip)}</div></div>`).join('')}</div>`).join('') || '<div class="text-secondary">Belum ada program.</div>';
+    }
     document.getElementById('programModal').addEventListener('show.bs.modal', e => {
-        const d = JSON.parse(e.relatedTarget.dataset.client);
-        document.getElementById('programTitle').textContent = 'Program ' + d.name;
-        const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-        document.getElementById('programBody').innerHTML = d.programs.map(p => `
-            <div class="mb-3"><div class="fw-bold mb-2" style="color:var(--pink-dark)">${esc(p.day_label)}</div>
-            ${p.exercises_json.map(x => `<div class="ex-row">${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm float-end ms-1" title="Lihat contoh gerakan" data-mv-play="${esc(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm float-end" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}<div class="fw-bold">${esc(x.name)}</div>
-                <div class="small">${esc(x.sets_reps)} &middot; ${x.target_kg > 0 ? esc(x.target_kg) + ' kg' : 'berat badan'} &middot; <span class="text-secondary">${esc(x.equipment)}</span></div>
-                <div class="tip">💡 ${esc(x.tip)}</div></div>`).join('')}</div>`).join('') || '<div class="text-secondary">Belum ada program.</div>';
+        programSourceBtn = e.relatedTarget;
+        programData = JSON.parse(e.relatedTarget.dataset.client);
+        document.getElementById('programTitle').textContent = 'Program ' + programData.name;
+        renderPrograms();
+    });
+    document.getElementById('programBody').addEventListener('click', e => {
+        const b = e.target.closest('[data-swap-ex]'); if (!b) return;
+        const pid = +b.dataset.program, idx = +b.dataset.index;
+        openSwap(pid, idx, (exercise, exercises) => {
+            const p = programData.programs.find(x => +x.id === pid);
+            if (p) p.exercises_json = exercises;
+            if (programSourceBtn) programSourceBtn.dataset.client = JSON.stringify(programData);
+            renderPrograms();
+        });
+    });
+
+    // --- Ganti Gerakan: ganti SATU gerakan dengan gerakan lain satu area otot (bukan generate ulang) ---
+    let swapCtx = null;
+    async function openSwap(programId, index, onDone) {
+        swapCtx = { programId, index, onDone };
+        const body = document.getElementById('swapExerciseBody');
+        document.getElementById('swapExerciseTitle').textContent = 'Ganti Gerakan';
+        body.innerHTML = '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm"></span> Mencari gerakan pengganti...</div>';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('swapExerciseModal')).show();
+        try {
+            const d = await api(`/program/${programId}/gerakan/${index}/alternatif`);
+            if (!swapCtx) return;
+            const cur = d.current;
+            let html = cur ? `<div class="small text-secondary mb-1">Gerakan sekarang:</div><div class="ex-row mb-3"><div class="fw-bold">${escP(cur.name)}</div><div class="small">${escP(cur.sets_reps)} &middot; ${escP(cur.equipment)}</div></div><div class="small text-secondary mb-1">Pilih pengganti (otot yang sama, alat yang tersedia):</div>` : '';
+            html += d.alternatives.length ? d.alternatives.map(a => `
+                <button type="button" class="btn btn-soft w-100 text-start mb-2" data-swap-pick="${escP(a.name)}">
+                    <span class="fw-bold d-block">${escP(a.name)}</span>
+                    <span class="small text-secondary">${escP(a.sets_reps)}${a.target_kg > 0 ? ' &middot; ' + escP(a.target_kg) + ' kg' : ''} &middot; ${escP(a.equipment)}</span>
+                </button>`).join('')
+                : '<div class="text-center text-secondary py-3">Belum ada gerakan alternatif lain untuk otot ini dengan alat yang tersedia.</div>';
+            body.innerHTML = html;
+        } catch (err) {
+            body.innerHTML = '<div class="text-center text-danger py-4">Pengganti belum bisa dimuat. Coba lagi ya.</div>';
+        }
+    }
+    document.getElementById('swapExerciseBody').addEventListener('click', async e => {
+        const b = e.target.closest('[data-swap-pick]'); if (!b || !swapCtx) return;
+        const { programId, index, onDone } = swapCtx;
+        b.disabled = true;
+        try {
+            const res = await api(`/program/${programId}/gerakan/${index}`, 'PATCH', { name: b.dataset.swapPick });
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('swapExerciseModal')).hide();
+            toast(res.message);
+            if (onDone) onDone(res.exercise, res.exercises);
+        } catch (err) { toast(err.message || 'Gagal mengganti gerakan.', 'danger'); b.disabled = false; }
+        swapCtx = null;
     });
 
     // --- Lihat foto alat dari modal program (ikon mata; hanya muncul bila alatnya punya foto) ---

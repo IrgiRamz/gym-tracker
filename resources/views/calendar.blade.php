@@ -76,6 +76,16 @@
     </div>
 </div>
 
+{{-- Ganti satu gerakan dengan gerakan lain satu area otot (dari live session) --}}
+<div class="modal fade" id="swapExerciseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="swapExerciseTitle">Ganti Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body" id="swapExerciseBody"></div>
+        </div>
+    </div>
+</div>
+
 {{-- Lihat foto alat (dari live session) --}}
 <div class="modal fade" id="equipmentImageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
@@ -274,12 +284,9 @@
         });
     }
 
-    function openLive(s) {
-        live = s;
-        document.getElementById('liveClient').textContent = s.client_name;
-        document.getElementById('liveProgram').textContent = s.program_label || 'Latihan bebas';
-        document.getElementById('liveNote').value = '';
-        document.getElementById('liveExercises').innerHTML = (s.exercises.length ? s.exercises : []).map((x, i) => `
+    // Satu kartu gerakan di live session.
+    function exCardHtml(x, i) {
+        return `
             <div class="ex-row position-relative" data-i="${i}" data-name="${esc(x.name)}" data-equipment="${esc(x.equipment)}" data-sets-reps="${esc(x.sets_reps)}">
                 ${(EXERCISE_MEDIA[mvKey(x.name)] || EQUIPMENT_IMAGES[x.equipment]) ? `<div class="position-absolute top-0 end-0 m-2 d-flex gap-1">${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat contoh gerakan" data-mv-play="${esc(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}</div>` : ''}
                 <div class="fw-bold">${esc(x.name)}</div>
@@ -288,9 +295,18 @@
                     ${Array.from({ length: Math.min(Math.max(x.default_sets || 3, 1), 8) }, () => setRowHtml(x.default_reps ?? '', x.target_kg || 0)).join('')}
                 </div>
                 <button type="button" class="btn btn-soft btn-sm w-100 mt-2 add-set-btn"><i class="bi bi-plus-circle"></i> Tambah Set</button>
+                ${live && live.program_id ? `<button type="button" class="btn btn-soft btn-sm w-100 mt-2 swap-ex-btn"><i class="bi bi-arrow-repeat"></i> Ganti Gerakan</button>` : ''}
                 <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2 skip-ex-btn"><i class="bi bi-skip-forward"></i> Lewati Gerakan Ini</button>
                 <div class="tip mt-2">💡 ${esc(x.tip)}</div>
-            </div>`).join('') || '<div class="text-secondary text-center py-3">Jadwal ini belum punya program gerakan.</div>';
+            </div>`;
+    }
+
+    function openLive(s) {
+        live = s;
+        document.getElementById('liveClient').textContent = s.client_name;
+        document.getElementById('liveProgram').textContent = s.program_label || 'Latihan bebas';
+        document.getElementById('liveNote').value = '';
+        document.getElementById('liveExercises').innerHTML = (s.exercises.length ? s.exercises : []).map((x, i) => exCardHtml(x, i)).join('') || '<div class="text-secondary text-center py-3">Jadwal ini belum punya program gerakan.</div>';
         panel.querySelectorAll('.ex-row').forEach(renumberSets);
         panel.classList.add('show');
         document.body.style.overflow = 'hidden';
@@ -338,6 +354,24 @@
     // Tambah/kurang baris set per gerakan, fleksibel mengikuti kekuatan klien hari itu.
     // Baris baru menyalin repetisi & beban baris terakhir; minimal tersisa 1 set.
     document.getElementById('liveExercises').addEventListener('click', e => {
+        const sw = e.target.closest('.swap-ex-btn');
+        if (sw) {
+            // Ganti gerakan ini dengan gerakan lain satu otot; programnya ikut ter revisi di server,
+            // kartu digambar ulang dengan target gerakan baru (baris set mulai dari default lagi).
+            const card = sw.closest('.ex-row');
+            const idx = +card.dataset.i;
+            openSwap(live.program_id, idx, (exercise) => {
+                const m = String(exercise.sets_reps || '').match(/(\d+)\s*x\s*(.+)/i);
+                const nx = { ...exercise, default_sets: m ? +m[1] : 3, default_reps: m ? m[2].trim() : '' };
+                live.exercises[idx] = nx;
+                const tmp = document.createElement('div');
+                tmp.innerHTML = exCardHtml(nx, idx);
+                const fresh = tmp.firstElementChild;
+                card.replaceWith(fresh);
+                renumberSets(fresh);
+            });
+            return;
+        }
         const sk = e.target.closest('.skip-ex-btn');
         if (sk) {
             // Lewati gerakan: kartu meredup, input mati, dan gerakan tidak ikut disimpan saat sesi selesai
@@ -369,6 +403,43 @@
             }
         }
     });
+    // --- Ganti Gerakan: ganti SATU gerakan dengan gerakan lain satu area otot (bukan generate ulang) ---
+    let swapCtx = null;
+    async function openSwap(programId, index, onDone) {
+        swapCtx = { programId, index, onDone };
+        const body = document.getElementById('swapExerciseBody');
+        document.getElementById('swapExerciseTitle').textContent = 'Ganti Gerakan';
+        body.innerHTML = '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm"></span> Mencari gerakan pengganti...</div>';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('swapExerciseModal')).show();
+        try {
+            const d = await api(`/program/${programId}/gerakan/${index}/alternatif`);
+            if (!swapCtx) return;
+            const cur = d.current;
+            let html = cur ? `<div class="small text-secondary mb-1">Gerakan sekarang:</div><div class="ex-row mb-3"><div class="fw-bold">${esc(cur.name)}</div><div class="small">${esc(cur.sets_reps)} &middot; ${esc(cur.equipment)}</div></div><div class="small text-secondary mb-1">Pilih pengganti (otot yang sama, alat yang tersedia):</div>` : '';
+            html += d.alternatives.length ? d.alternatives.map(a => `
+                <button type="button" class="btn btn-soft w-100 text-start mb-2" data-swap-pick="${esc(a.name)}">
+                    <span class="fw-bold d-block">${esc(a.name)}</span>
+                    <span class="small text-secondary">${esc(a.sets_reps)}${a.target_kg > 0 ? ' &middot; ' + esc(a.target_kg) + ' kg' : ''} &middot; ${esc(a.equipment)}</span>
+                </button>`).join('')
+                : '<div class="text-center text-secondary py-3">Belum ada gerakan alternatif lain untuk otot ini dengan alat yang tersedia.</div>';
+            body.innerHTML = html;
+        } catch (err) {
+            body.innerHTML = '<div class="text-center text-danger py-4">Pengganti belum bisa dimuat. Coba lagi ya.</div>';
+        }
+    }
+    document.getElementById('swapExerciseBody').addEventListener('click', async e => {
+        const b = e.target.closest('[data-swap-pick]'); if (!b || !swapCtx) return;
+        const { programId, index, onDone } = swapCtx;
+        b.disabled = true;
+        try {
+            const res = await api(`/program/${programId}/gerakan/${index}`, 'PATCH', { name: b.dataset.swapPick });
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('swapExerciseModal')).hide();
+            toast(res.message);
+            if (onDone) onDone(res.exercise, res.exercises);
+        } catch (err) { toast(err.message || 'Gagal mengganti gerakan.', 'danger'); b.disabled = false; }
+        swapCtx = null;
+    });
+
     function showBanner() {
         const b = document.getElementById('runningBanner');
         b.classList.toggle('d-none', !live);
