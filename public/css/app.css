@@ -66,6 +66,12 @@ body { min-height: 100vh; }
 
 /* Client card */
 .client-card { background: #fff; border: 1px solid var(--border); border-radius: 20px; padding: 14px; margin-bottom: 12px; }
+.client-head { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.client-chev { color: var(--muted); flex-shrink: 0; transition: transform .25s ease; }
+.client-card.open .client-chev { transform: rotate(180deg); }
+.client-detail { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s ease; }
+.client-detail-inner { overflow: hidden; min-height: 0; }
+.client-card.open .client-detail { grid-template-rows: 1fr; }
 .avatar { width: 46px; height: 46px; border-radius: 16px; background: linear-gradient(135deg, #f9a8d4, var(--pink)); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 1.1rem; flex-shrink: 0; }
 .tag { display: inline-block; font-size: .7rem; font-weight: 700; padding: .25rem .6rem; border-radius: 999px; background: var(--surface); color: var(--pink-dark); border: 1px solid var(--border); margin: 2px 2px 0 0; }
 .stat { text-align: center; background: var(--surface); border-radius: 14px; padding: 8px 4px; }

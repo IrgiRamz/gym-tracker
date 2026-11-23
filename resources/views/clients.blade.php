@@ -10,43 +10,54 @@
     <button class="btn btn-pink btn-sm" data-bs-toggle="modal" data-bs-target="#wizardModal" id="openWizard"><i class="bi bi-person-plus-fill"></i> Klien Baru</button>
 </div>
 
+@if($clients->isNotEmpty())
+    <div class="input-group mb-3">
+        <span class="input-group-text" style="background:#fff"><i class="bi bi-search"></i></span>
+        <input type="text" id="clientSearch" class="form-control" placeholder="Cari nama klien… misalnya: ayang" autocomplete="off">
+    </div>
+    <div id="clientSearchEmpty" class="text-center text-secondary py-4 d-none">Tidak ada klien yang cocok dengan pencarian "<b id="clientSearchTerm"></b>". Coba nama lain ya.</div>
+@endif
+
 @forelse($clients as $c)
-    <div class="client-card">
-        <div class="d-flex gap-3 align-items-center mb-2">
-            <div class="avatar">{{ mb_strtoupper(mb_substr($c->name, 0, 1)) }}</div>
-            <div class="flex-grow-1 min-w-0">
-                <div class="fw-bold">{{ $c->name }}</div>
-                <div class="small text-secondary"><i class="bi bi-whatsapp"></i> {{ $c->phone }}</div>
+    <div class="client-card" data-client-card data-name="{{ mb_strtolower($c->name) }}">
+        <button type="button" class="client-head" data-client-toggle aria-expanded="false">
+            <span class="avatar">{{ mb_strtoupper(mb_substr($c->name, 0, 1)) }}</span>
+            <span class="flex-grow-1" style="min-width:0">
+                <span class="fw-bold d-block text-truncate">{{ $c->name }}</span>
+                <span class="small text-secondary d-block"><i class="bi bi-whatsapp"></i> {{ $c->phone }}</span>
+            </span>
+            <i class="bi bi-chevron-down client-chev"></i>
+        </button>
+        <div class="client-detail"><div class="client-detail-inner"><div style="padding-top:10px">
+            <div class="mb-2">
+                <span class="tag">{{ $c->goal }}</span>@foreach($c->body_focus ?? [] as $f)<span class="tag">{{ $f }}</span>@endforeach<span class="tag">{{ $c->pt_frequency_per_week }}x / minggu</span>@if($c->age)<span class="tag">Umur {{ $c->age }} th</span>@endif@if($c->waist_cm)<span class="tag">Lingkar perut {{ $c->waist_cm }} cm</span>@endif
             </div>
-            <div class="d-flex align-items-center gap-1">
-                <button type="button" class="btn btn-soft btn-sm" title="Edit data klien" data-bs-toggle="modal" data-bs-target="#editModal"
-                    data-client="{{ json_encode(['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone, 'gender' => $c->gender, 'weight_kg' => (float) $c->weight_kg, 'height_cm' => $c->height_cm, 'waist_cm' => $c->waist_cm, 'goal' => $c->goal, 'goal_note' => $c->goal_note, 'body_focus' => $c->body_focus ?? [], 'pt_frequency_per_week' => (int) $c->pt_frequency_per_week, 'activity_level' => $c->activity_level ?? 'Cukup Aktif', 'remaining_sessions' => (int) $c->remaining_sessions, 'notes' => $c->notes]) }}"><i class="bi bi-pencil-fill"></i> Edit</button>
+            @if($c->goal_note)<div class="small text-secondary mb-2">🎯 {{ $c->goal_note }}</div>@endif
+            <div class="row g-2 mb-3">
+                <div class="col-4"><div class="stat"><b>{{ $c->remaining_sessions }}</b><span>Sisa sesi</span></div></div>
+                @php
+                    $first = $c->weightLogs->first();
+                    $diff = $first ? round($c->weight_kg - $first->weight_kg, 1) : 0;
+                @endphp
+                <div class="col-4"><div class="stat"><b>{{ rtrim(rtrim(number_format($c->weight_kg, 1), '0'), '.') }} kg</b>
+                    <span>Berat @if($diff != 0)<b class="d-inline" style="font-size:.68rem;color:{{ $diff < 0 ? '#16a34a' : '#db2777' }}">({{ $diff > 0 ? '+' : '' }}{{ rtrim(rtrim(number_format($diff, 1), '0'), '.') }})</b>@endif</span></div></div>
+                <div class="col-4"><div class="stat"><b style="font-size:.9rem">{{ $c->daily_protein_min && $c->daily_protein_max ? $c->daily_protein_min . '–' . $c->daily_protein_max : $c->daily_protein_target }} g</b><span>Protein/hari</span></div></div>
+            </div>
+            @if($c->notes)<div class="small text-secondary mb-2">📝 {{ $c->notes }}</div>@endif
+            <div class="d-flex gap-2">
+                <button class="btn btn-soft flex-fill btn-sm" data-bs-toggle="modal" data-bs-target="#programModal" data-client="{{ json_encode(['name' => $c->name, 'programs' => $c->activePrograms]) }}"><i class="bi bi-list-check"></i> Lihat Program</button>
+                <button class="btn btn-soft btn-sm" data-bs-toggle="modal" data-bs-target="#historyModal" data-id="{{ $c->id }}" data-name="{{ $c->name }}"><i class="bi bi-clock-history"></i> History</button>
+                <button class="btn btn-soft btn-sm" data-bs-toggle="modal" data-bs-target="#weightModal" data-id="{{ $c->id }}" data-name="{{ $c->name }}" data-weight="{{ $c->weight_kg + 0 }}" data-logs="{{ json_encode($c->weightLogs->map(fn ($l) => ['d' => $l->recorded_at->format('d M Y'), 'w' => $l->weight_kg + 0])->values()) }}"><i class="bi bi-speedometer2"></i> BB</button>
+                <button class="btn btn-soft btn-sm" data-bs-toggle="modal" data-bs-target="#sessionModal" data-id="{{ $c->id }}" data-name="{{ $c->name }}"><i class="bi bi-plus-circle"></i> Paket</button>
+            </div>
+            <div class="d-flex gap-2 mt-2">
+                <button type="button" class="btn btn-soft btn-sm flex-fill" title="Edit data klien" data-bs-toggle="modal" data-bs-target="#editModal"
+                    data-client="{{ json_encode(['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone, 'gender' => $c->gender, 'age' => $c->age, 'weight_kg' => (float) $c->weight_kg, 'height_cm' => $c->height_cm, 'waist_cm' => $c->waist_cm, 'goal' => $c->goal, 'goal_note' => $c->goal_note, 'body_focus' => $c->body_focus ?? [], 'pt_frequency_per_week' => (int) $c->pt_frequency_per_week, 'activity_level' => $c->activity_level ?? 'Cukup Aktif', 'remaining_sessions' => (int) $c->remaining_sessions, 'notes' => $c->notes]) }}"><i class="bi bi-pencil-fill"></i> Edit Data</button>
                 <form method="POST" action="{{ route('klien.destroy', $c) }}" data-confirm="Data {{ $c->name }} beserta seluruh jadwal dan programnya akan dihapus permanen." data-confirm-title="Hapus klien ini?">@csrf @method('DELETE')
-                    <button class="btn btn-sm text-danger"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Hapus</button>
                 </form>
             </div>
-        </div>
-        <div class="mb-2">
-            <span class="tag">{{ $c->goal }}</span>@foreach($c->body_focus ?? [] as $f)<span class="tag">{{ $f }}</span>@endforeach<span class="tag">{{ $c->pt_frequency_per_week }}x / minggu</span>@if($c->waist_cm)<span class="tag">Lingkar perut {{ $c->waist_cm }} cm</span>@endif
-        </div>
-        @if($c->goal_note)<div class="small text-secondary mb-2">🎯 {{ $c->goal_note }}</div>@endif
-        <div class="row g-2 mb-3">
-            <div class="col-4"><div class="stat"><b>{{ $c->remaining_sessions }}</b><span>Sisa sesi</span></div></div>
-            @php
-                $first = $c->weightLogs->first();
-                $diff = $first ? round($c->weight_kg - $first->weight_kg, 1) : 0;
-            @endphp
-            <div class="col-4"><div class="stat"><b>{{ rtrim(rtrim(number_format($c->weight_kg, 1), '0'), '.') }} kg</b>
-                <span>Berat @if($diff != 0)<b class="d-inline" style="font-size:.68rem;color:{{ $diff < 0 ? '#16a34a' : '#db2777' }}">({{ $diff > 0 ? '+' : '' }}{{ rtrim(rtrim(number_format($diff, 1), '0'), '.') }})</b>@endif</span></div></div>
-            <div class="col-4"><div class="stat"><b style="font-size:.9rem">{{ $c->daily_protein_min && $c->daily_protein_max ? $c->daily_protein_min . '–' . $c->daily_protein_max : $c->daily_protein_target }} g</b><span>Protein/hari</span></div></div>
-        </div>
-        @if($c->notes)<div class="small text-secondary mb-2">📝 {{ $c->notes }}</div>@endif
-        <div class="d-flex gap-2">
-            <button class="btn btn-soft flex-fill btn-sm" data-bs-toggle="modal" data-bs-target="#programModal" data-client="{{ json_encode(['name' => $c->name, 'programs' => $c->activePrograms]) }}"><i class="bi bi-list-check"></i> Lihat Program</button>
-            <button class="btn btn-soft btn-sm" data-bs-toggle="modal" data-bs-target="#historyModal" data-id="{{ $c->id }}" data-name="{{ $c->name }}"><i class="bi bi-clock-history"></i> History</button>
-            <button class="btn btn-soft btn-sm" data-bs-toggle="modal" data-bs-target="#weightModal" data-id="{{ $c->id }}" data-name="{{ $c->name }}" data-weight="{{ $c->weight_kg + 0 }}" data-logs="{{ json_encode($c->weightLogs->map(fn ($l) => ['d' => $l->recorded_at->format('d M Y'), 'w' => $l->weight_kg + 0])->values()) }}"><i class="bi bi-speedometer2"></i> BB</button>
-            <button class="btn btn-soft btn-sm" data-bs-toggle="modal" data-bs-target="#sessionModal" data-id="{{ $c->id }}" data-name="{{ $c->name }}"><i class="bi bi-plus-circle"></i> Paket</button>
-        </div>
+        </div></div></div>
     </div>
 @empty
     <div class="text-center text-secondary py-5">Belum ada klien. Ketuk <b>Klien Baru</b> untuk mulai ya ✨</div>
@@ -81,8 +92,12 @@
                         <div class="col-6"><label class="form-label">Tinggi (cm) <small class="text-secondary fw-normal">opsional</small></label>
                             <input name="height_cm" type="number" class="form-control" inputmode="numeric"></div>
                     </div>
-                    <div class="mt-3"><label class="form-label">Lingkar perut (cm) <small class="text-secondary fw-normal">opsional</small></label>
-                        <input name="waist_cm" type="number" min="40" max="250" class="form-control" inputmode="numeric" placeholder="Boleh dikosongkan"></div>
+                    <div class="row g-2 mt-3">
+                        <div class="col-6"><label class="form-label">Umur (tahun)</label>
+                            <input name="age" type="number" min="5" max="100" class="form-control" inputmode="numeric" placeholder="Contoh: 25" required></div>
+                        <div class="col-6"><label class="form-label">Lingkar perut (cm) <small class="text-secondary fw-normal">opsional</small></label>
+                            <input name="waist_cm" type="number" min="40" max="250" class="form-control" inputmode="numeric" placeholder="Boleh dikosongkan"></div>
+                    </div>
                     <div class="form-text mt-2">Lingkar perut cuma diisi bila klien nyaman diukur ya 💗</div>
                 </div>
 
@@ -173,8 +188,12 @@
                     <div class="col-6"><label class="form-label">Tinggi (cm) <small class="text-secondary fw-normal">opsional</small></label>
                         <input name="height_cm" type="number" class="form-control" inputmode="numeric"></div>
                 </div>
-                <div class="mb-3"><label class="form-label">Lingkar perut (cm) <small class="text-secondary fw-normal">opsional</small></label>
-                    <input name="waist_cm" type="number" min="40" max="250" class="form-control" inputmode="numeric" placeholder="Boleh dikosongkan"></div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6"><label class="form-label">Umur (tahun)</label>
+                        <input name="age" type="number" min="5" max="100" class="form-control" inputmode="numeric" placeholder="Contoh: 25" required></div>
+                    <div class="col-6"><label class="form-label">Lingkar perut (cm) <small class="text-secondary fw-normal">opsional</small></label>
+                        <input name="waist_cm" type="number" min="40" max="250" class="form-control" inputmode="numeric" placeholder="Boleh dikosongkan"></div>
+                </div>
                 <div class="mb-3"><label class="form-label">Tujuan utama</label>
                     <div class="chips" data-chip-group="goal">
                         @foreach($goals as $g)<span class="chip" data-value="{{ $g }}">{{ $g }}</span>@endforeach
@@ -315,6 +334,29 @@
     // Kunci pencocokan nama gerakan; wajib identik dengan ExerciseMedia::keyFor() di server.
     const mvKey = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 
+    // --- Kartu klien ringkas: ketuk kepala kartu (nama + WA) untuk membuka detail lengkap ke bawah ---
+    document.querySelectorAll('[data-client-toggle]').forEach(head => {
+        head.addEventListener('click', () => {
+            const card = head.closest('[data-client-card]');
+            const open = card.classList.toggle('open');
+            head.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    });
+
+    // --- Cari klien: saring kartu berdasarkan nama, langsung saat mengetik ---
+    const clientSearch = document.getElementById('clientSearch');
+    if (clientSearch) clientSearch.addEventListener('input', () => {
+        const q = clientSearch.value.trim().toLowerCase();
+        let visible = 0;
+        document.querySelectorAll('[data-client-card]').forEach(card => {
+            const show = !q || (card.dataset.name || '').includes(q);
+            card.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        document.getElementById('clientSearchTerm').textContent = clientSearch.value.trim();
+        document.getElementById('clientSearchEmpty').classList.toggle('d-none', visible > 0);
+    });
+
     // --- Choice chips ---
     document.querySelectorAll('[data-chip-group]').forEach(g => g.addEventListener('click', e => {
         const c = e.target.closest('.chip'); if (!c) return;
@@ -420,7 +462,7 @@
         const d = JSON.parse(e.relatedTarget.dataset.client), f = editForm.elements;
         editForm.action = '/klien/' + d.id;
         document.getElementById('editTitle').textContent = 'Edit ' + d.name + ' ✏️';
-        f.name.value = d.name; f.phone.value = d.phone; f.weight_kg.value = d.weight_kg;
+        f.name.value = d.name; f.phone.value = d.phone; f.age.value = d.age ?? ''; f.weight_kg.value = d.weight_kg;
         f.height_cm.value = d.height_cm ?? ''; f.waist_cm.value = d.waist_cm ?? ''; f.goal_note.value = d.goal_note ?? '';
         f.remaining_sessions.value = d.remaining_sessions; f.notes.value = d.notes ?? '';
         editForm.querySelectorAll('[data-chip-group]').forEach(g => {

@@ -138,8 +138,8 @@ class AiWorkoutService
             . "Jika fokusnya 'Seluruh Tubuh', buat tiap sesi menyeluruh dengan variasi gerakan.";
 
         $user = sprintf(
-            'Klien: %s, gender %s, berat %s kg, tinggi %s cm. Tujuan: %s. Fokus bagian tubuh (%d area): %s. Frekuensi PT: %dx/minggu. Catatan: %s',
-            $client['name'], $client['gender'], $client['weight_kg'], $client['height_cm'] ?? '-',
+            'Klien: %s, gender %s, umur %s tahun, berat %s kg, tinggi %s cm. Tujuan: %s. Fokus bagian tubuh (%d area): %s. Frekuensi PT: %dx/minggu. Catatan: %s',
+            $client['name'], $client['gender'], $client['age'] ?? '-', $client['weight_kg'], $client['height_cm'] ?? '-',
             $client['goal'] . (filled($client['goal_note']) ? ' — ' . $client['goal_note'] : ''),
             count($focus), implode(', ', $focus), $freq, $client['notes'] ?? '-'
         );
