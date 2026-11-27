@@ -51,12 +51,17 @@ class ScheduleController extends Controller
     }
 
     /** Sesi yang sedang berjalan (sudah dimulai, belum selesai) - untuk melanjutkan setelah refresh. */
-    public function running(): JsonResponse
+    public function running()
     {
         $s = Schedule::with('client', 'program')
             ->where('status', 'scheduled')->whereNotNull('started_at')
             ->latest('started_at')->first();
-        return response()->json($s ? $this->payload($s) : null);
+        if (! $s) {
+            // WAJIB badan 'null' yang sebenarnya: response()->json(null) di Laravel menghasilkan {}
+            // (objek kosong), yang di JS terbaca sebagai sesi berjalan dan memunculkan panel hantu.
+            return response('null', 200, ['Content-Type' => 'application/json']);
+        }
+        return response()->json($this->payload($s));
     }
 
     public function store(Request $request): JsonResponse
