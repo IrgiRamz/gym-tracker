@@ -281,7 +281,20 @@
     const panel = document.getElementById('livePanel');
 
     // Satu baris input per set: repetisi & beban aktual khusus set itu.
-    function setRowHtml(repsVal, kgVal) {
+    // Gerakan berbasis waktu (timed, mis. Plank): yang diisi durasi detiknya, tanpa kolom beban.
+    function setRowHtml(repsVal, kgVal, timed = false) {
+        if (timed) {
+            const secs = String(repsVal ?? '').replace(/[^0-9]/g, '');
+            return `<div class="set-row">
+            <span class="set-no"></span>
+            <div><label>Durasi (detik)</label>
+                <input type="number" min="0" inputmode="numeric" autocomplete="off" class="form-control set-reps" value="${esc(secs)}" aria-label="Durasi set dalam detik"></div>
+            <div><label>Beban</label>
+                <div class="form-control text-secondary" style="background:#f8f0f3">tanpa beban</div>
+                <input type="hidden" class="set-kg" value="0"></div>
+            <button type="button" class="btn btn-sm btn-outline-danger set-remove" title="Hapus set ini"><i class="bi bi-x-lg"></i></button>
+        </div>`;
+        }
         return `<div class="set-row">
             <span class="set-no"></span>
             <div><label>Repetisi</label>
@@ -303,12 +316,12 @@
     // Satu kartu gerakan di live session.
     function exCardHtml(x, i) {
         return `
-            <div class="ex-row position-relative" data-i="${i}" data-name="${esc(x.name)}" data-equipment="${esc(x.equipment)}" data-sets-reps="${esc(x.sets_reps)}">
+            <div class="ex-row position-relative" data-i="${i}" data-name="${esc(x.name)}" data-equipment="${esc(x.equipment)}" data-sets-reps="${esc(x.sets_reps)}" data-timed="${x.timed ? '1' : ''}">
                 ${(EXERCISE_MEDIA[mvKey(x.name)] || EQUIPMENT_IMAGES[x.equipment]) ? `<div class="position-absolute top-0 end-0 m-2 d-flex gap-1">${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat contoh gerakan" data-mv-play="${esc(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}</div>` : ''}
                 <div class="fw-bold">${esc(x.name)}${x.extra ? ' <span class="badge rounded-pill" style="background:var(--pink)">Tambahan</span>' : ''}</div>
                 <div class="small text-secondary mb-2">Target ${esc(x.sets_reps)}${x.target_kg > 0 ? ' &middot; ' + esc(x.target_kg) + ' kg' : ''} &middot; ${esc(x.equipment)}</div>
                 <div class="set-rows">
-                    ${Array.from({ length: Math.min(Math.max(x.default_sets || 3, 1), 8) }, () => setRowHtml(x.default_reps ?? '', x.target_kg || 0)).join('')}
+                    ${Array.from({ length: Math.min(Math.max(x.default_sets || 3, 1), 8) }, () => setRowHtml(x.default_reps ?? '', x.target_kg || 0, !!x.timed)).join('')}
                 </div>
                 <button type="button" class="btn btn-soft btn-sm w-100 mt-2 add-set-btn"><i class="bi bi-plus-circle"></i> Tambah Set</button>
                 ${live && ((x.in_program && live.program_id) || x.extra) ? `<button type="button" class="btn btn-soft btn-sm w-100 mt-2 swap-ex-btn"><i class="bi bi-arrow-repeat"></i> Ganti Gerakan</button>` : ''}
@@ -401,7 +414,8 @@
             const last = rows.lastElementChild;
             rows.insertAdjacentHTML('beforeend', setRowHtml(
                 last ? last.querySelector('.set-reps').value : '',
-                last ? last.querySelector('.set-kg').value : 0));
+                last ? last.querySelector('.set-kg').value : 0,
+                card.dataset.timed === '1'));
             renumberSets(card);
             return;
         }
@@ -637,6 +651,7 @@
             return {
                 name: r.dataset.name,
                 equipment: r.dataset.equipment,
+                ...(r.dataset.timed === '1' ? { timed: true } : {}),
                 sets: detail.length || null,
                 reps: detail.find(d => d.reps)?.reps ?? null,
                 sets_reps: r.dataset.setsReps, // target program (cadangan)

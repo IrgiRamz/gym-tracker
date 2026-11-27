@@ -81,12 +81,16 @@ class Schedule extends Model
             $kg = isset($p['actual_kg']) && $p['actual_kg'] !== '' ? (float) $p['actual_kg'] : null;
         }
 
+        // Gerakan berbasis waktu (Plank): kolom "reps" berisi durasi detik, tanpa beban.
+        $timed = ! empty($p['timed']);
         $parts = [];
         if ($sets) {
             $parts[] = $sets . ' set';
         }
         if ($reps !== null) {
-            $parts[] = self::repsLabel($reps);
+            $parts[] = $timed
+                ? (str_contains(strtolower($reps), 'detik') ? $reps : $reps . ' detik')
+                : self::repsLabel($reps);
         }
         $setsLabel = implode(' x ', $parts);
 
@@ -109,10 +113,14 @@ class Schedule extends Model
             }
         }
         if ($detail && $anyDetailData) {
-            $detailLabel = implode(' · ', array_map(function ($sd, $i) {
+            $detailLabel = implode(' · ', array_map(function ($sd, $i) use ($timed) {
                 $kgFmt = rtrim(rtrim(number_format($sd['kg'], 1, '.', ''), '0'), '.') . 'kg';
                 $t = 'S' . ($i + 1);
-                if ($sd['reps'] !== null && $sd['kg'] > 0) {
+                if ($timed) {
+                    $t .= $sd['reps'] !== null
+                        ? ' ' . (str_contains(strtolower($sd['reps']), 'detik') ? $sd['reps'] : $sd['reps'] . ' detik')
+                        : ' -';
+                } elseif ($sd['reps'] !== null && $sd['kg'] > 0) {
                     $t .= ' ' . $sd['reps'] . 'x' . $kgFmt;
                 } elseif ($sd['reps'] !== null) {
                     $t .= ' ' . $sd['reps'];
@@ -130,7 +138,7 @@ class Schedule extends Model
             'sets_label' => $setsLabel, 'summary' => $summary,
             // contoh: "Squat (Dumbbell): 3 set x 12 reps @ 10 kg"
             'line' => $name . ($equipment ? " ({$equipment})" : '') . ($summary !== '' ? ': ' . $summary : ''),
-            'sets_detail' => $detail, 'detail_label' => $detailLabel,
+            'sets_detail' => $detail, 'detail_label' => $detailLabel, 'timed' => $timed,
         ];
     }
 

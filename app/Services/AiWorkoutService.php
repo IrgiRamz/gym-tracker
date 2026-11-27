@@ -50,6 +50,38 @@ class AiWorkoutService
     }
 
     /**
+     * Satu-satunya pengecualian aturan wajib beralat: Plank (permintaan Irgi 2026-11-27).
+     * Gerakan berbasis WAKTU: targetnya durasi detik (mis. "3 x 45 detik"), tanpa beban.
+     * Hanya ditawarkan sebagai pilihan MANUAL pelatih (Tambah Gerakan / Ganti Gerakan
+     * area Perut & Pinggang); program otomatis (AI maupun template) tetap beralat semua.
+     */
+    private function timedExerciseEntry(): array
+    {
+        return [
+            'name' => 'Plank', 'equipment' => 'Tanpa Alat', 'sets_reps' => '3 x 45 detik',
+            'target_kg' => 0, 'timed' => true,
+            'tip' => 'Badan lurus dari kepala sampai tumit, kencangkan perut dan bokong, jangan sampai pinggul turun.',
+        ];
+    }
+
+    /** Bentuk resmi gerakan Plank dari masukan luar; null bila namanya bukan Plank. */
+    private function asTimedExercise(array $e): ?array
+    {
+        if (ExerciseMedia::keyFor((string) ($e['name'] ?? '')) !== 'plank') {
+            return null;
+        }
+        $entry = $this->timedExerciseEntry();
+        $setsReps = trim((string) ($e['sets_reps'] ?? ''));
+        if ($setsReps !== '') {
+            $entry['sets_reps'] = $setsReps;
+        }
+        if (! empty($e['tip'])) {
+            $entry['tip'] = (string) $e['tip'];
+        }
+        return $entry;
+    }
+
+    /**
      * Nama alat resmi dari daftar tersedia bila gerakan AI ini memakai alat itu;
      * null bila gerakannya tanpa alat atau alatnya tidak ada di daftar.
      * Program WAJIB hanya berisi gerakan beralat (keputusan Irgi 2026-11-23:
@@ -421,10 +453,15 @@ class AiWorkoutService
         $area = $this->muscleAreaFor((string) ($exercises[$index]['name'] ?? ''), $dayLabel, $lib);
 
         $used = array_map(fn ($x) => ExerciseMedia::keyFor((string) ($x['name'] ?? '')), $exercises);
-        return array_values(array_filter(
+        $out = array_values(array_filter(
             $lib[$area] ?? [],
             fn ($it) => ! in_array(ExerciseMedia::keyFor($it['name']), $used, true)
         ));
+        // Ganti ke Plank juga ditawarkan untuk gerakan perut (pilihan manual pelatih).
+        if ($area === 'Perut & Pinggang' && ! in_array('plank', $used, true)) {
+            $out[] = $this->timedExerciseEntry();
+        }
+        return $out;
     }
 
     /**
@@ -511,10 +548,15 @@ class AiWorkoutService
             return [];
         }
         $excl = array_map(fn ($n) => ExerciseMedia::keyFor((string) $n), $excludeNames);
-        return array_values(array_filter(
+        $out = array_values(array_filter(
             $lib[$area],
             fn ($it) => ! in_array(ExerciseMedia::keyFor($it['name']), $excl, true)
         ));
+        // Pilihan manual khusus area perut: Plank berbasis waktu (pengecualian beralat).
+        if ($area === 'Perut & Pinggang' && ! in_array('plank', $excl, true)) {
+            $out[] = $this->timedExerciseEntry();
+        }
+        return $out;
     }
 
     /**
@@ -597,6 +639,11 @@ class AiWorkoutService
     {
         if (empty($e['name']) || $this->isWarmup((string) $e['name'])) {
             return null;
+        }
+        // Pengecualian berbasis waktu: Plank boleh disimpan walau tanpa alat.
+        $timed = $this->asTimedExercise($e);
+        if ($timed) {
+            return $timed;
         }
         $equipments = Equipment::where('is_available', true)->pluck('name')->all();
         $eq = $this->matchedEquipment($e, $equipments);
