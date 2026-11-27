@@ -65,6 +65,8 @@
         </div>
         <div class="stopwatch my-2" id="stopwatch">00:00:00</div>
         <div id="liveExercises"></div>
+        <button type="button" class="btn btn-soft w-100 mt-2" id="addLiveExerciseBtn"><i class="bi bi-plus-circle"></i> Tambah Gerakan Lain</button>
+        <div class="small text-secondary text-center mt-1 mb-2">Buat permintaan ekstra klien di luar program. Khusus sesi ini saja, program tidak berubah.</div>
         <div class="mb-3">
             <label class="form-label">Catatan penyemangat dari PT 💌</label>
             <textarea id="liveNote" rows="3" class="form-control" placeholder="Contoh: Postur squat kamu makin bagus! Terus semangat ya."></textarea>
@@ -82,6 +84,20 @@
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title fw-bold" id="swapExerciseTitle">Ganti Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body" id="swapExerciseBody"></div>
+        </div>
+    </div>
+</div>
+
+{{-- Tambah gerakan khusus sesi: pilih area otot, pilih dari pustaka atau buat dengan AI --}}
+<div class="modal fade" id="addExerciseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold">Tambah Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="small text-secondary mb-1">Bagian tubuh yang mau dilatih:</div>
+                <div id="addAreaChips" class="mb-2"></div>
+                <div id="addExerciseBody"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -289,19 +305,20 @@
         return `
             <div class="ex-row position-relative" data-i="${i}" data-name="${esc(x.name)}" data-equipment="${esc(x.equipment)}" data-sets-reps="${esc(x.sets_reps)}">
                 ${(EXERCISE_MEDIA[mvKey(x.name)] || EQUIPMENT_IMAGES[x.equipment]) ? `<div class="position-absolute top-0 end-0 m-2 d-flex gap-1">${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat contoh gerakan" data-mv-play="${esc(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}</div>` : ''}
-                <div class="fw-bold">${esc(x.name)}</div>
+                <div class="fw-bold">${esc(x.name)}${x.extra ? ' <span class="badge rounded-pill" style="background:var(--pink)">Tambahan</span>' : ''}</div>
                 <div class="small text-secondary mb-2">Target ${esc(x.sets_reps)}${x.target_kg > 0 ? ' &middot; ' + esc(x.target_kg) + ' kg' : ''} &middot; ${esc(x.equipment)}</div>
                 <div class="set-rows">
                     ${Array.from({ length: Math.min(Math.max(x.default_sets || 3, 1), 8) }, () => setRowHtml(x.default_reps ?? '', x.target_kg || 0)).join('')}
                 </div>
                 <button type="button" class="btn btn-soft btn-sm w-100 mt-2 add-set-btn"><i class="bi bi-plus-circle"></i> Tambah Set</button>
-                ${live && live.program_id ? `<button type="button" class="btn btn-soft btn-sm w-100 mt-2 swap-ex-btn"><i class="bi bi-arrow-repeat"></i> Ganti Gerakan</button>` : ''}
+                ${live && ((x.in_program && live.program_id) || x.extra) ? `<button type="button" class="btn btn-soft btn-sm w-100 mt-2 swap-ex-btn"><i class="bi bi-arrow-repeat"></i> Ganti Gerakan</button>` : ''}
                 <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2 skip-ex-btn"><i class="bi bi-skip-forward"></i> Lewati Gerakan Ini</button>
                 <div class="tip mt-2">💡 ${esc(x.tip)}</div>
             </div>`;
     }
 
     function openLive(s) {
+        s.exercises = (s.exercises || []).map(x => ({ ...x, in_program: true }));
         live = s;
         document.getElementById('liveClient').textContent = s.client_name;
         document.getElementById('liveProgram').textContent = s.program_label || 'Latihan bebas';
@@ -356,20 +373,13 @@
     document.getElementById('liveExercises').addEventListener('click', e => {
         const sw = e.target.closest('.swap-ex-btn');
         if (sw) {
-            // Ganti gerakan ini dengan gerakan lain satu otot; programnya ikut ter revisi di server,
-            // kartu digambar ulang dengan target gerakan baru (baris set mulai dari default lagi).
+            // Gerakan dari program: pengganti tersimpan ke program di server.
+            // Gerakan tambahan khusus sesi: pengganti hanya berlaku di sesi ini.
+            // Keduanya menggambar ulang kartu dengan target baru (baris set mulai dari default lagi).
             const card = sw.closest('.ex-row');
             const idx = +card.dataset.i;
-            openSwap(live.program_id, idx, (exercise) => {
-                const m = String(exercise.sets_reps || '').match(/(\d+)\s*x\s*(.+)/i);
-                const nx = { ...exercise, default_sets: m ? +m[1] : 3, default_reps: m ? m[2].trim() : '' };
-                live.exercises[idx] = nx;
-                const tmp = document.createElement('div');
-                tmp.innerHTML = exCardHtml(nx, idx);
-                const fresh = tmp.firstElementChild;
-                card.replaceWith(fresh);
-                renumberSets(fresh);
-            });
+            if (live.exercises[idx]?.extra) openSwapLocal(idx);
+            else openSwap(live.program_id, idx, (exercise) => replaceLiveCard(idx, exercise));
             return;
         }
         const sk = e.target.closest('.skip-ex-btn');
@@ -404,9 +414,37 @@
         }
     });
     // --- Ganti Gerakan: ganti SATU gerakan dengan gerakan lain satu area otot (bukan generate ulang) ---
+    // Dua mode: 'program' (gerakan dari program, pengganti tersimpan ke program di server) dan
+    // 'local' (gerakan tambahan khusus sesi, pengganti hanya berlaku di sesi ini).
     let swapCtx = null;
+    function replaceLiveCard(idx, exercise) {
+        const old = live.exercises[idx] || {};
+        const m = String(exercise.sets_reps || '').match(/(\d+)\s*x\s*(.+)/i);
+        const nx = { ...exercise, default_sets: m ? +m[1] : 3, default_reps: m ? m[2].trim() : '', in_program: !!old.in_program, extra: !!old.extra };
+        live.exercises[idx] = nx;
+        const card = document.querySelector(`#liveExercises .ex-row[data-i="${idx}"]`);
+        if (!card) return;
+        const tmp = document.createElement('div');
+        tmp.innerHTML = exCardHtml(nx, idx);
+        const fresh = tmp.firstElementChild;
+        card.replaceWith(fresh);
+        renumberSets(fresh);
+    }
+    function renderSwapOptions(cur, alternatives) {
+        let html = cur ? `<div class="small text-secondary mb-1">Gerakan sekarang:</div><div class="ex-row mb-3"><div class="fw-bold">${esc(cur.name)}</div><div class="small">${esc(cur.sets_reps)} &middot; ${esc(cur.equipment)}</div></div><div class="small text-secondary mb-1">Pilih pengganti (otot yang sama, alat yang tersedia):</div>` : '';
+        html += alternatives.length ? alternatives.map(a => `
+                <button type="button" class="btn btn-soft w-100 text-start mb-2" data-swap-pick="${esc(a.name)}">
+                    <span class="fw-bold d-block">${esc(a.name)}</span>
+                    <span class="small text-secondary">${esc(a.sets_reps)}${a.target_kg > 0 ? ' &middot; ' + esc(a.target_kg) + ' kg' : ''} &middot; ${esc(a.equipment)}</span>
+                </button>`).join('')
+            : '<div class="text-center text-secondary py-3">Belum ada gerakan alternatif lain untuk otot ini dengan alat yang tersedia.</div>';
+        html += `<div class="mt-3"><div data-swap-ai-list></div>
+                <button type="button" class="btn btn-pink w-100" data-swap-ai>✨ Buatkan gerakan baru dengan AI</button>
+                <div class="small text-secondary mt-1 text-center">AI membuat satu gerakan baru khusus posisi ini: otot yang sama, alat yang tersedia, beda dari yang sudah ada. Ketuk lagi untuk variasi lain.</div></div>`;
+        return html;
+    }
     async function openSwap(programId, index, onDone) {
-        swapCtx = { programId, index, onDone };
+        swapCtx = { mode: 'program', programId, index, onDone, shown: [], aiByName: {}, libraryByName: {} };
         const body = document.getElementById('swapExerciseBody');
         document.getElementById('swapExerciseTitle').textContent = 'Ganti Gerakan';
         body.innerHTML = '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm"></span> Mencari gerakan pengganti...</div>';
@@ -414,20 +452,27 @@
         try {
             const d = await api(`/program/${programId}/gerakan/${index}/alternatif`);
             if (!swapCtx) return;
-            const cur = d.current;
-            let html = cur ? `<div class="small text-secondary mb-1">Gerakan sekarang:</div><div class="ex-row mb-3"><div class="fw-bold">${esc(cur.name)}</div><div class="small">${esc(cur.sets_reps)} &middot; ${esc(cur.equipment)}</div></div><div class="small text-secondary mb-1">Pilih pengganti (otot yang sama, alat yang tersedia):</div>` : '';
-            html += d.alternatives.length ? d.alternatives.map(a => `
-                <button type="button" class="btn btn-soft w-100 text-start mb-2" data-swap-pick="${esc(a.name)}">
-                    <span class="fw-bold d-block">${esc(a.name)}</span>
-                    <span class="small text-secondary">${esc(a.sets_reps)}${a.target_kg > 0 ? ' &middot; ' + esc(a.target_kg) + ' kg' : ''} &middot; ${esc(a.equipment)}</span>
-                </button>`).join('')
-                : '<div class="text-center text-secondary py-3">Belum ada gerakan alternatif lain untuk otot ini dengan alat yang tersedia.</div>';
-            swapCtx.shown = [cur?.name, ...d.alternatives.map(a => a.name)].filter(Boolean);
-            swapCtx.aiByName = {};
-            html += `<div class="mt-3"><div data-swap-ai-list></div>
-                <button type="button" class="btn btn-pink w-100" data-swap-ai>✨ Buatkan gerakan baru dengan AI</button>
-                <div class="small text-secondary mt-1 text-center">AI membuat satu gerakan baru khusus posisi ini: otot yang sama, alat yang tersedia, beda dari yang sudah ada. Ketuk lagi untuk variasi lain.</div></div>`;
-            body.innerHTML = html;
+            swapCtx.shown = [d.current?.name, ...d.alternatives.map(a => a.name)].filter(Boolean);
+            swapCtx.libraryByName = Object.fromEntries(d.alternatives.map(a => [a.name, a]));
+            body.innerHTML = renderSwapOptions(d.current, d.alternatives);
+        } catch (err) {
+            body.innerHTML = '<div class="text-center text-danger py-4">Pengganti belum bisa dimuat. Coba lagi ya.</div>';
+        }
+    }
+    async function openSwapLocal(idx) {
+        const cur = live.exercises[idx];
+        swapCtx = { mode: 'local', clientId: live.client_id, area: null, shown: [], aiByName: {}, libraryByName: {}, onDone: (exercise) => replaceLiveCard(idx, exercise) };
+        const body = document.getElementById('swapExerciseBody');
+        document.getElementById('swapExerciseTitle').textContent = 'Ganti Gerakan';
+        body.innerHTML = '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm"></span> Mencari gerakan pengganti...</div>';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('swapExerciseModal')).show();
+        try {
+            const d = await api('/gerakan/alternatif-nama', 'POST', { client_id: live.client_id, name: cur.name, exclude: live.exercises.map(x => x.name) });
+            if (!swapCtx) return;
+            swapCtx.area = d.area;
+            swapCtx.shown = [cur.name, ...d.alternatives.map(a => a.name)];
+            swapCtx.libraryByName = Object.fromEntries(d.alternatives.map(a => [a.name, a]));
+            body.innerHTML = renderSwapOptions(cur, d.alternatives);
         } catch (err) {
             body.innerHTML = '<div class="text-center text-danger py-4">Pengganti belum bisa dimuat. Coba lagi ya.</div>';
         }
@@ -439,7 +484,9 @@
             const label = aiBtn.innerHTML;
             aiBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> AI sedang membuat gerakan...';
             try {
-                const d = await api(`/program/${swapCtx.programId}/gerakan/${swapCtx.index}/alternatif-ai`, 'POST', { exclude: swapCtx.shown || [] });
+                const d = swapCtx.mode === 'local'
+                    ? await api('/gerakan/generate-area', 'POST', { client_id: swapCtx.clientId, area: swapCtx.area, exclude: [...live.exercises.map(x => x.name), ...(swapCtx.shown || [])] })
+                    : await api(`/program/${swapCtx.programId}/gerakan/${swapCtx.index}/alternatif-ai`, 'POST', { exclude: swapCtx.shown || [] });
                 const a = d.exercise;
                 (swapCtx.aiByName ??= {})[a.name] = a;
                 (swapCtx.shown ??= []).push(a.name);
@@ -455,17 +502,116 @@
         const bAi = e.target.closest('[data-swap-pick-ai]');
         const b = e.target.closest('[data-swap-pick]');
         if ((!b && !bAi) || !swapCtx) return;
-        const { programId, index, onDone } = swapCtx;
+        const ctx = swapCtx;
         const btn = bAi || b;
         btn.disabled = true;
+        if (ctx.mode === 'local') {
+            // Khusus sesi: cukup gambar ulang kartunya, tidak ada yang disimpan ke program.
+            const exercise = bAi ? ctx.aiByName[bAi.dataset.swapPickAi] : ctx.libraryByName[b.dataset.swapPick];
+            if (!exercise) { btn.disabled = false; return; }
+            swapCtx = null;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('swapExerciseModal')).hide();
+            toast(`Gerakan diganti jadi ${exercise.name} ✨`);
+            ctx.onDone(exercise);
+            return;
+        }
         try {
-            const payload = bAi ? { exercise: swapCtx.aiByName[bAi.dataset.swapPickAi] } : { name: b.dataset.swapPick };
-            const res = await api(`/program/${programId}/gerakan/${index}`, 'PATCH', payload);
+            const payload = bAi ? { exercise: ctx.aiByName[bAi.dataset.swapPickAi] } : { name: b.dataset.swapPick };
+            const res = await api(`/program/${ctx.programId}/gerakan/${ctx.index}`, 'PATCH', payload);
             bootstrap.Modal.getOrCreateInstance(document.getElementById('swapExerciseModal')).hide();
             toast(res.message);
-            if (onDone) onDone(res.exercise, res.exercises);
+            if (ctx.onDone) ctx.onDone(res.exercise, res.exercises);
         } catch (err) { toast(err.message || 'Gagal mengganti gerakan.', 'danger'); btn.disabled = false; }
         swapCtx = null;
+    });
+
+    // --- Tambah Gerakan khusus sesi ini: pilih area otot, lalu pilih dari pustaka atau buat dengan AI ---
+    const ADD_AREAS = ['Bokong (Glutes)', 'Kaki & Paha', 'Dada (Chest)', 'Punggung (Back)', 'Lengan & Bahu', 'Perut & Pinggang', 'Seluruh Tubuh'];
+    let addCtx = null;
+    function openAddExercise({ clientId, excludeNames, onPick }) {
+        addCtx = { clientId, excludeNames, onPick, area: null, shown: [], aiByName: {}, libraryByName: {} };
+        document.getElementById('addAreaChips').innerHTML = ADD_AREAS.map(a => `<button type="button" class="btn btn-soft btn-sm me-1 mb-1" data-add-area="${esc(a)}">${esc(a)}</button>`).join('');
+        document.getElementById('addExerciseBody').innerHTML = '<div class="text-center text-secondary py-3">Pilih dulu bagian tubuhnya di atas ya.</div>';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('addExerciseModal')).show();
+    }
+    async function loadAddArea(area) {
+        if (!addCtx) return;
+        addCtx.area = area; addCtx.shown = []; addCtx.aiByName = {}; addCtx.libraryByName = {};
+        document.querySelectorAll('#addAreaChips [data-add-area]').forEach(c => { const on = c.dataset.addArea === area; c.classList.toggle('btn-pink', on); c.classList.toggle('btn-soft', !on); });
+        const body = document.getElementById('addExerciseBody');
+        body.innerHTML = '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm"></span> Memuat gerakan...</div>';
+        try {
+            const d = await api('/gerakan/alternatif-area', 'POST', { client_id: addCtx.clientId, area, exclude: addCtx.excludeNames() });
+            if (!addCtx || addCtx.area !== area) return;
+            addCtx.shown = d.alternatives.map(a => a.name);
+            addCtx.libraryByName = Object.fromEntries(d.alternatives.map(a => [a.name, a]));
+            let html = d.alternatives.length ? d.alternatives.map(a => `
+                <button type="button" class="btn btn-soft w-100 text-start mb-2" data-add-pick="${esc(a.name)}">
+                    <span class="fw-bold d-block">${esc(a.name)}</span>
+                    <span class="small text-secondary">${esc(a.sets_reps)}${a.target_kg > 0 ? ' &middot; ' + esc(a.target_kg) + ' kg' : ''} &middot; ${esc(a.equipment)}</span>
+                </button>`).join('')
+                : '<div class="text-center text-secondary py-3">Semua gerakan pustaka untuk area ini sudah ada di sesi, atau alatnya belum tersedia.</div>';
+            html += `<div class="mt-3"><div data-add-ai-list></div>
+                <button type="button" class="btn btn-pink w-100" data-add-ai>✨ Buatkan gerakan baru dengan AI</button>
+                <div class="small text-secondary mt-1 text-center">AI membuat satu gerakan baru khusus area ini, alat yang tersedia, beda dari yang sudah ada. Ketuk lagi untuk variasi lain.</div></div>`;
+            body.innerHTML = html;
+        } catch (err) {
+            body.innerHTML = '<div class="text-center text-danger py-4">Gerakan belum bisa dimuat. Coba lagi ya.</div>';
+        }
+    }
+    document.getElementById('addExerciseModal').addEventListener('click', async e => {
+        const chip = e.target.closest('[data-add-area]');
+        if (chip && addCtx) { loadAddArea(chip.dataset.addArea); return; }
+        const aiBtn = e.target.closest('[data-add-ai]');
+        if (aiBtn && addCtx?.area) {
+            aiBtn.disabled = true;
+            const label = aiBtn.innerHTML;
+            aiBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> AI sedang membuat gerakan...';
+            try {
+                const d = await api('/gerakan/generate-area', 'POST', { client_id: addCtx.clientId, area: addCtx.area, exclude: [...addCtx.excludeNames(), ...addCtx.shown] });
+                const a = d.exercise;
+                addCtx.aiByName[a.name] = a;
+                addCtx.shown.push(a.name);
+                document.querySelector('#addExerciseBody [data-add-ai-list]').insertAdjacentHTML('afterbegin', `
+                <button type="button" class="btn btn-soft w-100 text-start mb-2" data-add-pick-ai="${esc(a.name)}">
+                    <span class="fw-bold d-block">${esc(a.name)} <span class="badge rounded-pill" style="background:var(--pink)">Baru dari AI</span></span>
+                    <span class="small text-secondary">${esc(a.sets_reps)}${a.target_kg > 0 ? ' &middot; ' + esc(a.target_kg) + ' kg' : ''} &middot; ${esc(a.equipment)}</span>
+                </button>`);
+            } catch (err) { toast(err.message || 'AI belum bisa membuat gerakan baru.', 'danger'); }
+            aiBtn.disabled = false; aiBtn.innerHTML = label;
+            return;
+        }
+        const bAi = e.target.closest('[data-add-pick-ai]');
+        const b = e.target.closest('[data-add-pick]');
+        if ((!b && !bAi) || !addCtx) return;
+        const btn = bAi || b;
+        const exercise = bAi ? addCtx.aiByName[bAi.dataset.addPickAi] : addCtx.libraryByName[b.dataset.addPick];
+        if (!exercise) return;
+        btn.disabled = true;
+        const ctx = addCtx;
+        try {
+            await ctx.onPick(exercise);
+            addCtx = null;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addExerciseModal')).hide();
+        } catch (err) { toast(err.message || 'Gagal menambahkan gerakan.', 'danger'); btn.disabled = false; }
+    });
+    document.getElementById('addLiveExerciseBtn').addEventListener('click', () => {
+        if (!live) return;
+        openAddExercise({
+            clientId: live.client_id,
+            excludeNames: () => live.exercises.map(x => x.name),
+            onPick: async (exercise) => {
+                const m = String(exercise.sets_reps || '').match(/(\d+)\s*x\s*(.+)/i);
+                const nx = { ...exercise, default_sets: m ? +m[1] : 3, default_reps: m ? m[2].trim() : '', extra: true };
+                const container = document.getElementById('liveExercises');
+                if (!container.querySelector('.ex-row')) container.innerHTML = '';
+                live.exercises.push(nx);
+                const idx = live.exercises.length - 1;
+                container.insertAdjacentHTML('beforeend', exCardHtml(nx, idx));
+                renumberSets(container.querySelector(`.ex-row[data-i="${idx}"]`));
+                toast(`Gerakan ${exercise.name} ditambahkan ke sesi ini ✨`);
+            }
+        });
     });
 
     function showBanner() {

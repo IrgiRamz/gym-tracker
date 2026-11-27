@@ -33,6 +33,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/klien/{client}', [ClientController::class, 'destroy'])->name('klien.destroy');
     Route::get('/program/{program}/gerakan/{index}/alternatif', [ClientController::class, 'exerciseAlternatives'])->name('program.alternatif');
     Route::post('/program/{program}/gerakan/{index}/alternatif-ai', [ClientController::class, 'exerciseAlternativeAi'])->name('program.alternatifAi');
+    Route::post('/program/{program}/gerakan', [ClientController::class, 'appendExercise'])->name('program.tambahGerakan');
+    Route::delete('/program/{program}/gerakan/{index}', [ClientController::class, 'deleteExercise'])->name('program.hapusGerakan');
+    Route::post('/gerakan/alternatif-area', [ClientController::class, 'areaAlternatives'])->name('gerakan.alternatifArea');
+    Route::post('/gerakan/generate-area', [ClientController::class, 'areaGenerate'])->name('gerakan.generateArea');
+    Route::post('/gerakan/alternatif-nama', [ClientController::class, 'nameAlternatives'])->name('gerakan.alternatifNama');
     Route::patch('/program/{program}/gerakan/{index}', [ClientController::class, 'swapExercise'])->name('program.ganti');
 
     Route::get('/alat', [EquipmentController::class, 'index'])->name('alat.index');

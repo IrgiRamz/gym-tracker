@@ -274,6 +274,102 @@ class ClientController extends Controller
         return response()->json(['exercise' => $new]);
     }
 
+    /** Alternatif gerakan dari satu area otot (JSON, untuk modal Tambah Gerakan di kedua halaman). */
+    public function areaAlternatives(Request $request, AiWorkoutService $ai): JsonResponse
+    {
+        $data = $request->validate([
+            'client_id' => ['required', 'exists:clients,id'],
+            'area' => ['required', 'string', Rule::in($ai->areas())],
+            'exclude' => ['nullable', 'array', 'max:30'],
+            'exclude.*' => ['string', 'max:100'],
+        ]);
+        $client = Client::findOrFail($data['client_id']);
+        return response()->json(['alternatives' => $ai->alternativesForArea($client, $data['area'], $data['exclude'] ?? [])]);
+    }
+
+    /** Buat satu gerakan baru dengan AI untuk satu area otot (JSON, untuk modal Tambah Gerakan). */
+    public function areaGenerate(Request $request, AiWorkoutService $ai): JsonResponse
+    {
+        $data = $request->validate([
+            'client_id' => ['required', 'exists:clients,id'],
+            'area' => ['required', 'string', Rule::in($ai->areas())],
+            'exclude' => ['nullable', 'array', 'max:30'],
+            'exclude.*' => ['string', 'max:100'],
+        ]);
+        $client = Client::findOrFail($data['client_id']);
+        $new = $ai->generateForArea($client, $data['area'], $data['exclude'] ?? []);
+        if (! $new) {
+            return response()->json(['message' => 'AI belum bisa membuat gerakan baru saat ini. Coba lagi sebentar ya.'], 422);
+        }
+        return response()->json(['exercise' => $new]);
+    }
+
+    /** Alternatif mengganti gerakan berdasarkan nama saja (JSON, untuk gerakan tambahan khusus sesi di live session). */
+    public function nameAlternatives(Request $request, AiWorkoutService $ai): JsonResponse
+    {
+        $data = $request->validate([
+            'client_id' => ['required', 'exists:clients,id'],
+            'name' => ['required', 'string', 'max:100'],
+            'exclude' => ['nullable', 'array', 'max:30'],
+            'exclude.*' => ['string', 'max:100'],
+        ]);
+        $client = Client::findOrFail($data['client_id']);
+        [$area, $alternatives] = $ai->alternativesForName($client, $data['name'], $data['exclude'] ?? []);
+        return response()->json(['area' => $area, 'alternatives' => $alternatives]);
+    }
+
+    /** Tambah SATU gerakan ke program (manual oleh pelatih dari Lihat Program). */
+    public function appendExercise(Request $request, WorkoutProgram $program, AiWorkoutService $ai): JsonResponse
+    {
+        $data = $request->validate([
+            'exercise.name' => ['required', 'string', 'max:100'],
+            'exercise.equipment' => ['required', 'string', 'max:100'],
+            'exercise.sets_reps' => ['required', 'string', 'max:30'],
+            'exercise.target_kg' => ['nullable', 'numeric', 'min:0', 'max:500'],
+            'exercise.tip' => ['nullable', 'string', 'max:300'],
+        ]);
+        $alt = $ai->validateReplacement($data['exercise']);
+        if (! $alt) {
+            return response()->json(['message' => 'Gerakan itu tidak valid (harus memakai alat yang tersedia).'], 422);
+        }
+        $exercises = $program->exercises_json ?? [];
+        $newKey = ExerciseMedia::keyFor($alt['name']);
+        foreach ($exercises as $x) {
+            if (ExerciseMedia::keyFor((string) ($x['name'] ?? '')) === $newKey) {
+                return response()->json(['message' => 'Gerakan itu sudah ada di sesi ini.'], 422);
+            }
+        }
+        $exercises[] = $alt;
+        $exercises = array_values($exercises);
+        $program->update(['exercises_json' => $exercises]);
+        return response()->json([
+            'message' => "Gerakan {$alt['name']} ditambahkan ke {$program->day_label} ✨",
+            'exercise' => $alt,
+            'exercises' => $exercises,
+            'index' => count($exercises) - 1,
+        ]);
+    }
+
+    /** Hapus SATU gerakan dari program (manual oleh pelatih dari Lihat Program). */
+    public function deleteExercise(WorkoutProgram $program, int $index): JsonResponse
+    {
+        $exercises = $program->exercises_json ?? [];
+        if (! isset($exercises[$index])) {
+            return response()->json(['message' => 'Gerakan tidak ditemukan di program ini.'], 404);
+        }
+        if (count($exercises) <= 1) {
+            return response()->json(['message' => 'Satu sesi minimal punya 1 gerakan, jadi gerakan terakhir tidak bisa dihapus.'], 422);
+        }
+        $old = $exercises[$index]['name'];
+        array_splice($exercises, $index, 1);
+        $exercises = array_values($exercises);
+        $program->update(['exercises_json' => $exercises]);
+        return response()->json([
+            'message' => "Gerakan {$old} dihapus dari program",
+            'exercises' => $exercises,
+        ]);
+    }
+
     /** Ganti SATU gerakan dalam program dengan gerakan lain (bukan generate ulang). */
     public function swapExercise(Request $request, WorkoutProgram $program, int $index, AiWorkoutService $ai): JsonResponse
     {

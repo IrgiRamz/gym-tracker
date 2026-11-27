@@ -492,6 +492,102 @@ class AiWorkoutService
         }
     }
 
+    /** Daftar area otot yang dikenal pustaka (untuk pilihan Tambah Gerakan). */
+    public function areas(): array
+    {
+        return ['Bokong (Glutes)', 'Kaki & Paha', 'Dada (Chest)', 'Punggung (Back)', 'Lengan & Bahu', 'Perut & Pinggang', 'Seluruh Tubuh'];
+    }
+
+    /**
+     * Alternatif dari satu AREA otot tertentu (fitur Tambah Gerakan): gerakan pustaka
+     * untuk area itu, hanya yang beralat dan alatnya tersedia, dikurangi nama-nama
+     * yang dikecualikan (mis. gerakan yang sudah ada di sesi).
+     */
+    public function alternativesForArea(Client $client, string $area, array $excludeNames = []): array
+    {
+        $equipments = Equipment::where('is_available', true)->pluck('name')->all();
+        $lib = $this->buildLibrary($equipments, $client->gender === 'Wanita');
+        if (! isset($lib[$area])) {
+            return [];
+        }
+        $excl = array_map(fn ($n) => ExerciseMedia::keyFor((string) $n), $excludeNames);
+        return array_values(array_filter(
+            $lib[$area],
+            fn ($it) => ! in_array(ExerciseMedia::keyFor($it['name']), $excl, true)
+        ));
+    }
+
+    /**
+     * Alternatif untuk mengganti gerakan berdasarkan NAMANYA saja (untuk gerakan
+     * tambahan khusus sesi yang tidak tercatat di program): area dibaca dari nama
+     * gerakan. Mengembalikan [area, daftar alternatif].
+     */
+    public function alternativesForName(Client $client, string $name, array $excludeNames = []): array
+    {
+        $equipments = Equipment::where('is_available', true)->pluck('name')->all();
+        $lib = $this->buildLibrary($equipments, $client->gender === 'Wanita');
+        $area = $this->muscleAreaFor($name, '', $lib);
+        $excludeNames[] = $name;
+        return [$area, $this->alternativesForArea($client, $area, $excludeNames)];
+    }
+
+    /**
+     * Buat SATU gerakan BARU memakai AI untuk satu AREA otot tertentu (fitur Tambah
+     * Gerakan): wajib beralat dari daftar, beda dari nama-nama yang dikecualikan.
+     * Null bila AI tidak tersedia atau hasilnya tidak lolos saringan.
+     */
+    public function generateForArea(Client $client, string $area, array $excludeNames = []): ?array
+    {
+        if (! config('services.gemini.key')) {
+            return null;
+        }
+        $equipments = Equipment::where('is_available', true)->pluck('name')->all();
+        if (! $equipments) {
+            return null;
+        }
+        $avoid = array_values(array_unique($excludeNames));
+        $system = 'Kamu adalah personal trainer profesional. Buat TEPAT SATU gerakan latihan dalam Bahasa Indonesia. '
+            . 'WAJIB memakai satu alat dari daftar berikut: ' . implode('; ', $equipments) . '. '
+            . 'Balas HANYA JSON object: {"name":"...","equipment":"(nama persis dari daftar alat)","sets_reps":"3 x 12","target_kg":0,"tip":"tips singkat"}. '
+            . 'Gerakan bodyweight/tanpa alat DILARANG. Pemanasan BUKAN gerakan. target_kg berupa angka perkiraan beban alat, konservatif sesuai profil klien.';
+        $user = sprintf(
+            'Klien: %s, gender %s, umur %s tahun, berat %s kg. Buat SATU gerakan latihan yang melatih area otot: %s. Jangan pakai gerakan ini: %s.',
+            $client->name, $client->gender, $client->age ?? '-', $client->weight_kg,
+            $area, $avoid ? implode(', ', $avoid) : '-'
+        );
+
+        try {
+            $model = config('services.gemini.model');
+            $res = Http::timeout(40)->withHeaders(['x-goog-api-key' => config('services.gemini.key')])
+                ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
+                    'systemInstruction' => ['parts' => [['text' => $system]]],
+                    'contents' => [['role' => 'user', 'parts' => [['text' => $user]]]],
+                    'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0.9],
+                ]);
+            if (! $res->successful()) {
+                throw new \RuntimeException('HTTP ' . $res->status());
+            }
+            $e = json_decode((string) $res->json('candidates.0.content.parts.0.text'), true);
+            if (! is_array($e)) {
+                return null;
+            }
+            $valid = $this->validateReplacement($e);
+            if (! $valid) {
+                return null;
+            }
+            $newKey = ExerciseMedia::keyFor($valid['name']);
+            foreach ($avoid as $a) {
+                if (ExerciseMedia::keyFor($a) === $newKey) {
+                    return null;
+                }
+            }
+            return $valid;
+        } catch (Throwable $e) {
+            Log::warning('Gemini gagal membuat gerakan untuk area: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     /**
      * Validasi gerakan pengganti dari luar (pilihan pustaka tidak lewat sini; ini untuk
      * hasil generate AI yang dipilih pelatih): wajib beralat, alatnya ada di daftar,
