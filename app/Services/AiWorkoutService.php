@@ -243,7 +243,7 @@ class AiWorkoutService
             'Kaki & Paha' => [
                 $ex('Goblet Squat', 'dumbbell', '3 x 12', 6, 'Punggung tegak, lutut searah jari kaki.'),
                 $ex('Leg Press', 'leg press', '3 x 12', 30, 'Jangan kunci lutut di ujung gerakan.'),
-                $ex('Leg Extension', 'leg extension', '3 x 12', 15, 'Tahan 1 detik di atas, turun perlahan.'),
+                $ex('Leg Extension', ['leg extension', 'curl extension'], '3 x 12', 15, 'Tahan 1 detik di atas, turun perlahan.'),
                 $ex('Leg Curl', 'leg curl', '3 x 12', 15, 'Tarik tumit ke arah bokong, gerakan terkontrol.'),
                 $ex('Walking Lunges', 'dumbbell', '2 x 10 /kaki', 4, 'Langkah cukup lebar, lutut stabil.'),
                 $ex('Hack Squat', 'hack squat', '3 x 10', 20, 'Punggung menempel sandaran, turun sampai nyaman.'),
