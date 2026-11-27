@@ -350,6 +350,26 @@ class ClientController extends Controller
         ]);
     }
 
+    /** Atur ulang urutan gerakan dalam satu sesi program (seret & letakkan di Lihat Program). */
+    public function reorderExercises(Request $request, WorkoutProgram $program): JsonResponse
+    {
+        $exercises = $program->exercises_json ?? [];
+        $data = $request->validate([
+            'order' => ['required', 'array', 'size:' . count($exercises)],
+            'order.*' => ['integer', 'min:0', 'max:' . (count($exercises) - 1)],
+        ]);
+        $order = $data['order'];
+        if (array_values(array_unique($order)) !== $order || array_diff($order, range(0, count($exercises) - 1))) {
+            return response()->json(['message' => 'Urutan gerakan tidak valid.'], 422);
+        }
+        $sorted = array_map(fn ($i) => $exercises[$i], $order);
+        $program->update(['exercises_json' => $sorted]);
+        return response()->json([
+            'message' => 'Urutan gerakan disimpan ✨',
+            'exercises' => $sorted,
+        ]);
+    }
+
     /** Hapus SATU gerakan dari program (manual oleh pelatih dari Lihat Program). */
     public function deleteExercise(WorkoutProgram $program, int $index): JsonResponse
     {

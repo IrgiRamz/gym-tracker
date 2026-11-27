@@ -34,6 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/program/{program}/gerakan/{index}/alternatif', [ClientController::class, 'exerciseAlternatives'])->name('program.alternatif');
     Route::post('/program/{program}/gerakan/{index}/alternatif-ai', [ClientController::class, 'exerciseAlternativeAi'])->name('program.alternatifAi');
     Route::post('/program/{program}/gerakan', [ClientController::class, 'appendExercise'])->name('program.tambahGerakan');
+    Route::patch('/program/{program}/urutan-gerakan', [ClientController::class, 'reorderExercises'])->name('program.urutanGerakan');
     Route::delete('/program/{program}/gerakan/{index}', [ClientController::class, 'deleteExercise'])->name('program.hapusGerakan');
     Route::post('/gerakan/alternatif-area', [ClientController::class, 'areaAlternatives'])->name('gerakan.alternatifArea');
     Route::post('/gerakan/generate-area', [ClientController::class, 'areaGenerate'])->name('gerakan.generateArea');

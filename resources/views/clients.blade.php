@@ -351,6 +351,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 (function () {
     // Peta nama alat => URL foto alat (hanya alat yang punya foto).
@@ -567,9 +568,37 @@
     function renderPrograms() {
         document.getElementById('programBody').innerHTML = programData.programs.map(p => `
             <div class="mb-3"><div class="fw-bold mb-2" style="color:var(--pink-dark)">${escP(p.day_label)}</div>
-            ${p.exercises_json.map((x, xi) => `<div class="ex-row"><button type="button" class="btn btn-soft btn-sm float-end ms-1" title="Ganti gerakan ini dengan gerakan lain satu otot" data-swap-ex data-program="${p.id}" data-index="${xi}"><i class="bi bi-arrow-repeat"></i> Ganti</button><button type="button" class="btn btn-outline-danger btn-sm float-end ms-1" title="Hapus gerakan ini dari program" data-del-ex data-program="${p.id}" data-index="${xi}"><i class="bi bi-trash"></i></button>${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm float-end ms-1" title="Lihat contoh gerakan" data-mv-play="${escP(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm float-end" title="Lihat foto alat" data-eq-photo="${escP(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}<div class="fw-bold">${escP(x.name)}</div>
+            <div class="ex-list" data-program="${p.id}">${p.exercises_json.map((x, xi) => `<div class="ex-row" data-index="${xi}"><span class="ex-grip float-start" title="Tahan dan geser untuk mengubah urutan"><i class="bi bi-grip-vertical"></i></span><button type="button" class="btn btn-soft btn-sm float-end ms-1" title="Ganti gerakan ini dengan gerakan lain satu otot" data-swap-ex data-program="${p.id}" data-index="${xi}"><i class="bi bi-arrow-repeat"></i> Ganti</button><button type="button" class="btn btn-outline-danger btn-sm float-end ms-1" title="Hapus gerakan ini dari program" data-del-ex data-program="${p.id}" data-index="${xi}"><i class="bi bi-trash"></i></button>${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm float-end ms-1" title="Lihat contoh gerakan" data-mv-play="${escP(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm float-end" title="Lihat foto alat" data-eq-photo="${escP(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}<div class="fw-bold">${escP(x.name)}</div>
                 <div class="small">${escP(x.sets_reps)} &middot; ${x.target_kg > 0 ? escP(x.target_kg) + ' kg' : 'berat badan'} &middot; <span class="text-secondary">${escP(x.equipment)}</span></div>
-                <div class="tip">💡 ${escP(x.tip)}</div></div>`).join('')}<button type="button" class="btn btn-soft btn-sm w-100 mt-1" data-add-ex data-program="${p.id}"><i class="bi bi-plus-circle"></i> Tambah Gerakan</button></div>`).join('') || '<div class="text-secondary">Belum ada program.</div>';
+                <div class="tip">💡 ${escP(x.tip)}</div></div>`).join('')}</div><button type="button" class="btn btn-soft btn-sm w-100 mt-1" data-add-ex data-program="${p.id}"><i class="bi bi-plus-circle"></i> Tambah Gerakan</button></div>`).join('') || '<div class="text-secondary">Belum ada program.</div>';
+        initSortables();
+    }
+    // --- Seret untuk mengatur urutan gerakan dalam satu sesi (hasilnya tersimpan ke program) ---
+    let sortables = [];
+    function initSortables() {
+        sortables.forEach(s => s.destroy());
+        sortables = [];
+        if (!window.Sortable) return; // pustaka seret gagal dimuat: daftar tetap tampil, hanya tidak bisa diseret
+        document.querySelectorAll('#programBody .ex-list').forEach(list => {
+            sortables.push(Sortable.create(list, {
+                handle: '.ex-grip',
+                animation: 150,
+                ghostClass: 'ex-ghost',
+                onEnd: async (evt) => {
+                    if (evt.oldIndex === evt.newIndex) return;
+                    const pid = +list.dataset.program;
+                    const order = [...list.querySelectorAll('.ex-row')].map(r => +r.dataset.index);
+                    try {
+                        const res = await api(`/program/${pid}/urutan-gerakan`, 'PATCH', { order });
+                        const p = programData.programs.find(x => +x.id === pid);
+                        if (p) p.exercises_json = res.exercises;
+                        if (programSourceBtn) programSourceBtn.dataset.client = JSON.stringify(programData);
+                        renderPrograms();
+                        toast(res.message);
+                    } catch (err) { toast(err.message || 'Gagal mengubah urutan.', 'danger'); renderPrograms(); }
+                }
+            }));
+        });
     }
     document.getElementById('programModal').addEventListener('show.bs.modal', e => {
         programSourceBtn = e.relatedTarget;

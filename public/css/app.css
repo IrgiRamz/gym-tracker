@@ -87,6 +87,9 @@ body { min-height: 100vh; }
 .live-badge::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #dc2626; margin-right: 6px; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { opacity: .2; } }
 .ex-row { border: 1px solid var(--border); border-radius: 16px; padding: 12px; margin-bottom: 10px; background: var(--surface); }
+.ex-grip { cursor: grab; color: var(--pink-dark); font-size: 1.15rem; line-height: 1.4; padding: 0 6px 0 0; touch-action: none; }
+.ex-grip:active { cursor: grabbing; }
+.ex-ghost { opacity: .35; }
 .ex-row .tip { font-size: .75rem; color: var(--muted); }
 /* 3 input compact sejajar: Set | Repetisi | Beban (mudah diketuk jempol) */
 .live-inputs { display: grid; grid-template-columns: .8fr 1.1fr 1.1fr; gap: 8px; }
