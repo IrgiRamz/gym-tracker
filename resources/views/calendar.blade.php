@@ -327,7 +327,8 @@
         panel.querySelectorAll('.ex-row').forEach(renumberSets);
         panel.classList.add('show');
         document.body.style.overflow = 'hidden';
-        const start = new Date(s.started_at).getTime();
+        let start = new Date(s.started_at).getTime();
+        if (!Number.isFinite(start)) start = Date.now(); // started_at tidak valid: jangan sampai stopwatch menampilkan NaN
         clearInterval(timer);
         const tick = () => {
             const sec = Math.max(0, Math.floor((Date.now() - start) / 1000));
@@ -660,16 +661,19 @@
         if (!live || !(await confirmModal({ title: 'Batalkan sesi ini?', text: 'Stopwatch direset dan beban yang sudah diisi hari ini tidak akan tersimpan. Sesi klien tidak berkurang dan tidak ada pesan WA yang dikirim.', yes: 'Ya, batalkan', no: 'Lanjut latihan', icon: '⚠️', danger: true }))) return;
         try {
             await api(`/jadwal/${live.id}/batal-mulai`, 'POST');
-            clearInterval(timer); live = null; closeLive(); showBanner();
             toast('Sesi dibatalkan. Jadwal kembali seperti semula 🌸');
-            await load();
-        } catch (err) { toast(err.message, 'danger'); }
+        } catch (err) {
+            // Sesi sudah tidak ada di server (sudah selesai/dihapus): panel tetap ditutup supaya tidak nyangkut.
+            toast('Sesi ini sudah tidak tercatat di server, panel ditutup ya 🌸');
+        }
+        clearInterval(timer); live = null; closeLive(); showBanner();
+        await load();
     };
 
     // Lanjutkan sesi yang masih berjalan setelah refresh
     (async () => {
         await load();
-        try { const r = await api('{{ route('jadwal.running') }}'); if (r) { openLive(r); closeLive(); } } catch (e) {}
+        try { const r = await api('{{ route('jadwal.running') }}'); if (r && r.id && r.started_at) { openLive(r); closeLive(); } } catch (e) {}
     })();
 })();
 </script>
