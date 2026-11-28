@@ -36,7 +36,7 @@
         @foreach($grouped[$cat] as $eq)
             <div class="agenda-item">
                 @if($eq->image_path)
-                    <img src="{{ $eq->imageUrl() }}" alt="Foto {{ $eq->name }}" class="rounded-3 flex-shrink-0" style="width:52px;height:52px;object-fit:cover;cursor:pointer" title="Lihat foto alat" data-eq-photo-view data-name="{{ $eq->name }}" data-full="{{ $eq->imageUrl() }}">
+                    <img src="{{ $eq->thumbUrl() }}" alt="Foto {{ $eq->name }}" class="rounded-3 flex-shrink-0" style="width:52px;height:52px;object-fit:cover;cursor:pointer" title="Lihat foto alat" data-eq-photo-view data-name="{{ $eq->name }}" data-full="{{ $eq->imageUrl() }}">
                 @endif
                 <div class="agenda-body">
                     <div class="nm {{ $eq->is_available ? '' : 'text-decoration-line-through text-secondary' }}" data-eq-name>{{ $eq->name }}</div>
@@ -97,7 +97,7 @@
                 @if($row['media']->kind() === 'video')
                     <video src="{{ $row['media']->mediaUrl() }}" class="rounded-3 flex-shrink-0" style="width:52px;height:52px;object-fit:cover;cursor:pointer" muted loop playsinline preload="metadata" title="Lihat contoh gerakan" data-mv-view data-name="{{ $row['name'] }}" data-url="{{ $row['media']->mediaUrl() }}" data-kind="video" data-credit="{{ $row['media']->credit }}"></video>
                 @else
-                    <img src="{{ $row['media']->mediaUrl() }}" alt="Contoh {{ $row['name'] }}" class="rounded-3 flex-shrink-0" style="width:52px;height:52px;object-fit:cover;cursor:pointer" title="Lihat contoh gerakan" data-mv-view data-name="{{ $row['name'] }}" data-url="{{ $row['media']->mediaUrl() }}" data-kind="image" data-credit="{{ $row['media']->credit }}">
+                    <img src="{{ $row['media']->thumbUrl() }}" alt="Contoh {{ $row['name'] }}" class="rounded-3 flex-shrink-0" style="width:52px;height:52px;object-fit:cover;cursor:pointer" title="Lihat contoh gerakan" data-mv-view data-name="{{ $row['name'] }}" data-url="{{ $row['media']->mediaUrl() }}" data-kind="image" data-credit="{{ $row['media']->credit }}">
                 @endif
             @endif
             <div class="agenda-body">

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasThumb;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
 class ExerciseMedia extends Model
 {
+    use HasThumb;
+
     protected $table = 'exercise_media';
     protected $fillable = ['name', 'name_key', 'media_path', 'credit'];
 
@@ -28,6 +31,12 @@ class ExerciseMedia extends Model
     public function mediaUrl(): ?string
     {
         return $this->media_path ? Storage::disk('public')->url($this->media_path) : null;
+    }
+
+    /** URL media versi kecil untuk daftar (khusus gambar; video tetap file asli). */
+    public function thumbUrl(): ?string
+    {
+        return $this->kind() === 'image' ? $this->thumbUrlFor($this->media_path) : $this->mediaUrl();
     }
 
     /** 'video' untuk mp4/webm/mov, 'image' untuk gif/jpg/png/webp. */

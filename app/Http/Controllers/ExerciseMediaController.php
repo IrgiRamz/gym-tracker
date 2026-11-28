@@ -39,9 +39,11 @@ class ExerciseMediaController extends Controller
         $media->name = trim($data['name']);
         if ($media->media_path) {
             Storage::disk('public')->delete($media->media_path);
+            ExerciseMedia::deleteThumb($media->media_path);
         }
         $media->media_path = $request->file('media')->store('gerakan', 'public');
         $media->save();
+        ExerciseMedia::makeThumb($media->media_path);
 
         return back()->with('success', 'Media gerakan ' . $media->name . ' berhasil disimpan 🎬');
     }
@@ -51,6 +53,7 @@ class ExerciseMediaController extends Controller
     {
         if ($exerciseMedia->media_path) {
             Storage::disk('public')->delete($exerciseMedia->media_path);
+            ExerciseMedia::deleteThumb($exerciseMedia->media_path);
         }
         $name = $exerciseMedia->name;
         $exerciseMedia->delete();

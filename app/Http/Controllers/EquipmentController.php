@@ -66,6 +66,7 @@ class EquipmentController extends Controller
             'is_available' => true,
             'image_path' => $path,
         ]);
+        Equipment::makeThumb($path);
         return back()->with('success', 'Alat berhasil ditambahkan ✨');
     }
 
@@ -78,8 +79,10 @@ class EquipmentController extends Controller
 
         if ($equipment->image_path) {
             Storage::disk('public')->delete($equipment->image_path);
+            Equipment::deleteThumb($equipment->image_path);
         }
         $equipment->update(['image_path' => $request->file('image')->store('equipments', 'public')]);
+        Equipment::makeThumb($equipment->image_path);
         return back()->with('success', 'Foto ' . $equipment->name . ' berhasil disimpan 📸');
     }
 
@@ -88,6 +91,7 @@ class EquipmentController extends Controller
     {
         if ($equipment->image_path) {
             Storage::disk('public')->delete($equipment->image_path);
+            Equipment::deleteThumb($equipment->image_path);
             $equipment->update(['image_path' => null]);
         }
         return back()->with('success', 'Foto ' . $equipment->name . ' sudah dihapus.');
@@ -115,6 +119,7 @@ class EquipmentController extends Controller
     {
         if ($equipment->image_path) {
             Storage::disk('public')->delete($equipment->image_path);
+            Equipment::deleteThumb($equipment->image_path);
         }
         $equipment->delete();
         return back()->with('success', 'Alat sudah dihapus.');
