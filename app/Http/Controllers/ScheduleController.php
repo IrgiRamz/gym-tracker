@@ -118,6 +118,18 @@ class ScheduleController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /**
+     * Rencana gerakan sesi untuk modal "atur dulu sebelum mulai": payload yang sama
+     * seperti mulai, tapi TIDAK mengisi started_at dan tidak mengubah apa pun.
+     * Pelatih menata daftar gerakan hari ini dulu (khusus sesi ini); sesi baru
+     * benar-benar dimulai lewat start() saat ia menekan Mulai Sesi.
+     */
+    public function plan(Schedule $schedule): JsonResponse
+    {
+        abort_if($schedule->status !== 'scheduled', 422, 'Jadwal ini sudah selesai atau dibatalkan.');
+        return response()->json($this->payload($schedule));
+    }
+
     public function start(Schedule $schedule): JsonResponse
     {
         abort_if($schedule->status !== 'scheduled', 422, 'Jadwal ini sudah selesai atau dibatalkan.');

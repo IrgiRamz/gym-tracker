@@ -56,6 +56,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/jadwal/berjalan', [ScheduleController::class, 'running'])->name('jadwal.running');
     Route::post('/jadwal', [ScheduleController::class, 'store'])->name('jadwal.store');
     Route::delete('/jadwal/{schedule}', [ScheduleController::class, 'destroy'])->name('jadwal.destroy');
+    Route::get('/jadwal/{schedule}/rencana', [ScheduleController::class, 'plan'])->name('jadwal.plan');
     Route::post('/jadwal/{schedule}/mulai', [ScheduleController::class, 'start'])->name('jadwal.start');
     Route::post('/jadwal/{schedule}/batal-mulai', [ScheduleController::class, 'cancelStart'])->name('jadwal.cancelStart');
     Route::post('/jadwal/{schedule}/selesai', [ScheduleController::class, 'finish'])->name('jadwal.finish');

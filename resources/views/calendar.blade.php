@@ -102,6 +102,40 @@
     </div>
 </div>
 
+{{-- Atur gerakan hari ini sebelum sesi dimulai (khusus sesi ini, program tidak berubah) --}}
+<div class="modal fade" id="planModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><div><h5 class="modal-title fw-bold" id="planTitle">Latihan Hari Ini</h5><div class="small text-secondary" id="planSub"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="small text-secondary mb-2">Atur dulu gerakan yang mau dilakukan hari ini: edit target, ganti, hapus, tambah, atau geser urutannya. Perubahan ini khusus sesi hari ini ya, program latihannya tidak berubah.</div>
+                <div id="planList"></div>
+                <button type="button" class="btn btn-soft btn-sm w-100 mt-1" id="planAddBtn"><i class="bi bi-plus-circle"></i> Tambah Gerakan</button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-pink w-100" id="planStartBtn"><i class="bi bi-play-fill"></i> Mulai Sesi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Edit target satu gerakan di rencana hari ini --}}
+<div class="modal fade" id="planEditModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:440px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="planEditTitle">Edit Target</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="planEditIndex">
+                <div class="mb-3"><label class="form-label fw-bold small" for="planEditSetsReps">Target set x repetisi / durasi</label>
+                    <input type="text" class="form-control" id="planEditSetsReps" maxlength="30" placeholder="mis. 3 x 12 atau 3 x 45 detik"></div>
+                <div id="planEditKgWrap"><label class="form-label fw-bold small" for="planEditKg">Target beban (kg)</label>
+                    <input type="number" class="form-control" id="planEditKg" step="0.5" min="0" inputmode="decimal"></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-pink w-100" id="planEditSave">Simpan Target</button></div>
+        </div>
+    </div>
+</div>
+
 {{-- Lihat foto alat (dari live session) --}}
 <div class="modal fade" id="equipmentImageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
@@ -128,6 +162,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 (function () {
     const CLIENTS = @json($clients);
@@ -208,8 +243,8 @@
         const st = e.target.closest('[data-start]'), del = e.target.closest('[data-del]');
         try {
             if (st) {
-                const s = await api(`/jadwal/${st.dataset.start}/mulai`, 'POST');
-                openLive(s); await load();
+                // Klik Mulai TIDAK langsung memulai: buka dulu modal rencana gerakan hari ini.
+                await openPlan(+st.dataset.start);
             } else if (del && await confirmModal({ title: 'Hapus jadwal ini?', text: 'Jadwal latihan ini akan dihapus dari kalender.', yes: 'Ya, hapus', icon: '🗑️', danger: true })) {
                 const gone = items.find(x => x.id == del.dataset.del);
                 await api(`/jadwal/${del.dataset.del}`, 'DELETE');
@@ -392,7 +427,7 @@
             // Keduanya menggambar ulang kartu dengan target baru (baris set mulai dari default lagi).
             const card = sw.closest('.ex-row');
             const idx = +card.dataset.i;
-            if (live.exercises[idx]?.extra) openSwapLocal(idx);
+            if (live.exercises[idx]?.extra || live.planned) openSwapLocal(idx);
             else openSwap(live.program_id, idx, (exercise) => replaceLiveCard(idx, exercise));
             return;
         }
@@ -500,7 +535,7 @@
             aiBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> AI sedang membuat gerakan...';
             try {
                 const d = swapCtx.mode === 'local'
-                    ? await api('/gerakan/generate-area', 'POST', { client_id: swapCtx.clientId, area: swapCtx.area, exclude: [...live.exercises.map(x => x.name), ...(swapCtx.shown || [])] })
+                    ? await api('/gerakan/generate-area', 'POST', { client_id: swapCtx.clientId, area: swapCtx.area, exclude: [...(swapCtx.excludeNames ? swapCtx.excludeNames() : live.exercises.map(x => x.name)), ...(swapCtx.shown || [])] })
                     : await api(`/program/${swapCtx.programId}/gerakan/${swapCtx.index}/alternatif-ai`, 'POST', { exclude: swapCtx.shown || [] });
                 const a = d.exercise;
                 (swapCtx.aiByName ??= {})[a.name] = a;
@@ -538,6 +573,131 @@
             if (ctx.onDone) ctx.onDone(res.exercise, res.exercises);
         } catch (err) { toast(err.message || 'Gagal mengganti gerakan.', 'danger'); btn.disabled = false; }
         swapCtx = null;
+    });
+
+    // --- Rencana gerakan hari ini: klik Mulai membuka modal penataan dulu (khusus sesi ini) ---
+    // Daftar kerja di memori saja; program TIDAK berubah. Tombol Mulai Sesi di modal inilah
+    // yang memanggil endpoint mulai, lalu panel live dibuka memakai daftar hasil tataan
+    // (live.planned = true, sehingga Ganti Gerakan di tengah sesi juga bersifat lokal).
+    let planCtx = null;
+    let planSortable = null;
+    async function openPlan(scheduleId) {
+        const s = await api(`/jadwal/${scheduleId}/rencana`);
+        planCtx = { scheduleId, clientId: s.client_id, exercises: (s.exercises || []).map(x => ({ ...x })) };
+        document.getElementById('planTitle').textContent = 'Latihan ' + s.client_name;
+        document.getElementById('planSub').textContent = s.program_label || 'Latihan bebas';
+        renderPlan();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('planModal')).show();
+    }
+    function renderPlan() {
+        const list = document.getElementById('planList');
+        list.innerHTML = planCtx.exercises.map((x, i) => `
+            <div class="ex-row" data-index="${i}">
+                <span class="ex-grip float-start" title="Tahan dan geser untuk mengubah urutan"><i class="bi bi-grip-vertical"></i></span>
+                <div class="float-end d-flex gap-1">
+                    <button type="button" class="btn btn-soft btn-sm" title="Edit target gerakan ini untuk hari ini" data-plan-edit="${i}"><i class="bi bi-pencil"></i></button>
+                    <button type="button" class="btn btn-soft btn-sm" title="Ganti gerakan ini untuk hari ini" data-plan-swap="${i}"><i class="bi bi-arrow-repeat"></i></button>
+                    <button type="button" class="btn btn-soft btn-sm" title="Hapus gerakan ini dari sesi hari ini" data-plan-del="${i}"><i class="bi bi-trash"></i></button>
+                </div>
+                <div class="fw-bold">${esc(x.name)}${x.timed ? ' <span class="badge rounded-pill" style="background:var(--pink)">Durasi</span>' : ''}</div>
+                <div class="small text-secondary">Target ${esc(x.sets_reps)}${x.target_kg > 0 ? ' &middot; ' + esc(x.target_kg) + ' kg' : ''} &middot; ${esc(x.equipment)}</div>
+                ${x.tip ? `<div class="tip">💡 ${esc(x.tip)}</div>` : ''}
+            </div>`).join('') || '<div class="text-center text-secondary py-3">Belum ada gerakan untuk hari ini. Tambah dulu ya lewat tombol di bawah.</div>';
+        document.getElementById('planStartBtn').disabled = planCtx.exercises.length === 0;
+        if (planSortable) { planSortable.destroy(); planSortable = null; }
+        if (window.Sortable && planCtx.exercises.length > 1) {
+            planSortable = Sortable.create(list, {
+                handle: '.ex-grip', animation: 150, ghostClass: 'ex-ghost',
+                onEnd: (evt) => {
+                    if (evt.oldIndex === evt.newIndex) return;
+                    const [mv] = planCtx.exercises.splice(evt.oldIndex, 1);
+                    planCtx.exercises.splice(evt.newIndex, 0, mv);
+                    renderPlan();
+                }
+            });
+        }
+    }
+    function openPlanEdit(i) {
+        const x = planCtx.exercises[i];
+        document.getElementById('planEditTitle').textContent = 'Edit Target: ' + x.name;
+        document.getElementById('planEditIndex').value = i;
+        document.getElementById('planEditSetsReps').value = x.sets_reps || '';
+        document.getElementById('planEditKg').value = x.target_kg || 0;
+        document.getElementById('planEditKgWrap').style.display = x.timed ? 'none' : '';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('planEditModal')).show();
+    }
+    document.getElementById('planEditSave').addEventListener('click', () => {
+        if (!planCtx) return;
+        const i = +document.getElementById('planEditIndex').value;
+        const sr = document.getElementById('planEditSetsReps').value.trim();
+        if (sr) planCtx.exercises[i].sets_reps = sr;
+        if (!planCtx.exercises[i].timed) planCtx.exercises[i].target_kg = parseFloat(document.getElementById('planEditKg').value) || 0;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('planEditModal')).hide();
+        renderPlan();
+    });
+    document.getElementById('planList').addEventListener('click', async e => {
+        if (!planCtx) return;
+        const ed = e.target.closest('[data-plan-edit]');
+        if (ed) { openPlanEdit(+ed.dataset.planEdit); return; }
+        const sw = e.target.closest('[data-plan-swap]');
+        if (sw) { openSwapPlan(+sw.dataset.planSwap); return; }
+        const del = e.target.closest('[data-plan-del]');
+        if (del) {
+            const i = +del.dataset.planDel;
+            const x = planCtx.exercises[i];
+            if (await confirmModal({ title: 'Hapus dari sesi hari ini?', text: `${x.name} tidak jadi dilakukan hari ini. Program latihannya tidak berubah.`, yes: 'Ya, hapus', icon: '🗑️', danger: true })) {
+                planCtx.exercises.splice(i, 1);
+                renderPlan();
+            }
+        }
+    });
+    // Ganti gerakan di modal rencana: mode lokal (sumber daftar = rencana, bukan sesi live).
+    async function openSwapPlan(idx) {
+        const cur = planCtx.exercises[idx];
+        swapCtx = { mode: 'local', clientId: planCtx.clientId, area: null, shown: [], aiByName: {}, libraryByName: {},
+            excludeNames: () => planCtx.exercises.map(x => x.name),
+            onDone: (exercise) => { planCtx.exercises[idx] = { ...exercise }; renderPlan(); } };
+        const body = document.getElementById('swapExerciseBody');
+        document.getElementById('swapExerciseTitle').textContent = 'Ganti Gerakan';
+        body.innerHTML = '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm"></span> Mencari gerakan pengganti...</div>';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('swapExerciseModal')).show();
+        try {
+            const d = await api('/gerakan/alternatif-nama', 'POST', { client_id: planCtx.clientId, name: cur.name, exclude: planCtx.exercises.map(x => x.name) });
+            if (!swapCtx) return;
+            swapCtx.area = d.area;
+            swapCtx.shown = [cur.name, ...d.alternatives.map(a => a.name)];
+            swapCtx.libraryByName = Object.fromEntries(d.alternatives.map(a => [a.name, a]));
+            body.innerHTML = renderSwapOptions(cur, d.alternatives);
+        } catch (err) {
+            body.innerHTML = '<div class="text-center text-danger py-4">Pengganti belum bisa dimuat. Coba lagi ya.</div>';
+        }
+    }
+    document.getElementById('planAddBtn').addEventListener('click', () => {
+        if (!planCtx) return;
+        openAddExercise({
+            clientId: planCtx.clientId,
+            excludeNames: () => planCtx.exercises.map(x => x.name),
+            onPick: async (exercise) => { planCtx.exercises.push({ ...exercise }); renderPlan(); toast(`${exercise.name} ditambahkan untuk hari ini ✨`); }
+        });
+    });
+    document.getElementById('planStartBtn').addEventListener('click', async () => {
+        if (!planCtx || !planCtx.exercises.length) return;
+        const btn = document.getElementById('planStartBtn');
+        btn.disabled = true;
+        const label = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memulai...';
+        try {
+            const s = await api(`/jadwal/${planCtx.scheduleId}/mulai`, 'POST');
+            s.exercises = planCtx.exercises.map(x => {
+                const m = String(x.sets_reps || '').match(/(\d+)\s*x\s*(.+)/i);
+                return { ...x, default_sets: m ? +m[1] : 3, default_reps: m ? m[2].trim() : '' };
+            });
+            s.planned = true;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('planModal')).hide();
+            planCtx = null;
+            openLive(s);
+            await load();
+        } catch (err) { toast(err.message, 'danger'); btn.disabled = false; btn.innerHTML = label; }
     });
 
     // --- Tambah Gerakan khusus sesi ini: pilih area otot, lalu pilih dari pustaka atau buat dengan AI ---
