@@ -85,6 +85,7 @@
             <div class="modal-header"><div><h5 class="modal-title fw-bold" id="planTitle">Latihan Hari Ini</h5><div class="small text-secondary" id="planSub"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="small text-secondary mb-2">Atur dulu gerakan yang mau dilakukan hari ini: edit target, ganti, hapus, tambah, atau geser urutannya. Perubahan ini khusus sesi hari ini ya, program latihannya tidak berubah.</div>
+                <div id="planDraftNote" class="small text-secondary d-none mb-2"><i class="bi bi-bookmark-check"></i> Rencana yang kamu atur tadi tersimpan otomatis di HP ini, tinggal lanjut atur atau langsung mulai.</div>
                 <div id="planList"></div>
                 <button type="button" class="btn btn-soft btn-sm w-100 mt-1" id="planAddBtn"><i class="bi bi-plus-circle"></i> Tambah Gerakan</button>
             </div>
@@ -590,12 +591,30 @@
     // (live.planned = true, sehingga Ganti Gerakan di tengah sesi juga bersifat lokal).
     let planCtx = null;
     let planSortable = null;
+    // Draf rencana disimpan otomatis di HP ini per jadwal, jadi tataan tidak hilang
+    // saat modal ditutup lalu dibuka lagi. Draf hanya dipakai bila daftar bawaan
+    // program belum berubah sejak draf dibuat (sidik jarinya sama); draf terhapus
+    // begitu sesinya dimulai, atau bila tataannya dikembalikan persis ke bawaan.
+    const planStore = {
+        key: id => 'gymPlanDraft:' + id,
+        load(id) { try { const raw = localStorage.getItem(this.key(id)); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } },
+        save(id, base, exercises) { try { localStorage.setItem(this.key(id), JSON.stringify({ base, exercises })); } catch (e) {} },
+        clear(id) { try { localStorage.removeItem(this.key(id)); } catch (e) {} },
+    };
+    const planFingerprint = exercises => JSON.stringify((exercises || []).map(x => [x.name, x.sets_reps, x.target_kg ?? 0, x.timed ? 1 : 0]));
     async function openPlan(scheduleId) {
         const s = await api(`/jadwal/${scheduleId}/rencana`);
-        planCtx = { scheduleId, clientId: s.client_id, exercises: (s.exercises || []).map(x => ({ ...x })) };
+        planCtx = { scheduleId, clientId: s.client_id, exercises: (s.exercises || []).map(x => ({ ...x })), base: planFingerprint(s.exercises || []) };
+        let restored = false;
+        const draft = planStore.load(scheduleId);
+        if (draft && draft.base === planCtx.base && Array.isArray(draft.exercises) && draft.exercises.length) {
+            planCtx.exercises = draft.exercises.map(x => ({ ...x }));
+            restored = true;
+        }
         document.getElementById('planTitle').textContent = 'Latihan ' + s.client_name;
         document.getElementById('planSub').textContent = s.program_label || 'Latihan bebas';
         renderPlan();
+        document.getElementById('planDraftNote').classList.toggle('d-none', !restored);
         bootstrap.Modal.getOrCreateInstance(document.getElementById('planModal')).show();
     }
     function renderPlan() {
@@ -626,6 +645,10 @@
                 }
             });
         }
+        // Simpan draf otomatis: tataan yang berbeda dari bawaan program disimpan di HP,
+        // tataan yang kembali persis ke bawaan menghapus drafnya.
+        if (planFingerprint(planCtx.exercises) === planCtx.base) planStore.clear(planCtx.scheduleId);
+        else planStore.save(planCtx.scheduleId, planCtx.base, planCtx.exercises);
     }
     function openPlanEdit(i) {
         const x = planCtx.exercises[i];
@@ -704,6 +727,7 @@
             });
             s.planned = true;
             bootstrap.Modal.getOrCreateInstance(document.getElementById('planModal')).hide();
+            planStore.clear(planCtx.scheduleId);
             planCtx = null;
             openLive(s);
             await load();
