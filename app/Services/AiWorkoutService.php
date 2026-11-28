@@ -50,27 +50,48 @@ class AiWorkoutService
     }
 
     /**
-     * Satu-satunya pengecualian aturan wajib beralat: Plank (permintaan Irgi 2026-11-27).
-     * Gerakan berbasis WAKTU: targetnya durasi detik (mis. "3 x 45 detik"), tanpa beban.
-     * Hanya ditawarkan sebagai pilihan MANUAL pelatih (Tambah Gerakan / Ganti Gerakan
-     * area Perut & Pinggang); program otomatis (AI maupun template) tetap beralat semua.
+     * Pengecualian aturan wajib beralat: gerakan berbasis WAKTU (durasi detik, tanpa
+     * beban) yang diminta Irgi satu per satu: Plank (2026-11-27) dan Wall Sit (2026-11-28).
+     * Hanya ditawarkan sebagai pilihan MANUAL pelatih (Tambah Gerakan / Ganti Gerakan);
+     * program otomatis (AI maupun template) tetap beralat semua.
      */
-    private function timedExerciseEntry(): array
+    private function timedEntries(): array
     {
         return [
-            'name' => 'Plank', 'equipment' => 'Tanpa Alat', 'sets_reps' => '3 x 45 detik',
-            'target_kg' => 0, 'timed' => true,
-            'tip' => 'Badan lurus dari kepala sampai tumit, kencangkan perut dan bokong, jangan sampai pinggul turun.',
+            'plank' => [
+                'name' => 'Plank', 'equipment' => 'Tanpa Alat', 'sets_reps' => '3 x 45 detik',
+                'target_kg' => 0, 'timed' => true,
+                'tip' => 'Badan lurus dari kepala sampai tumit, kencangkan perut dan bokong, jangan sampai pinggul turun.',
+            ],
+            'wall sit' => [
+                'name' => 'Wall Sit', 'equipment' => 'Tanpa Alat', 'sets_reps' => '3 x 45 detik',
+                'target_kg' => 0, 'timed' => true,
+                'tip' => 'Punggung menempel penuh ke dinding, lutut menekuk 90 derajat seperti duduk di kursi, tahan posisinya.',
+            ],
         ];
     }
 
-    /** Bentuk resmi gerakan Plank dari masukan luar; null bila namanya bukan Plank. */
+    /** Gerakan berbasis waktu yang ditawarkan untuk satu area (pilihan manual pelatih). */
+    private function timedForArea(string $area): array
+    {
+        $keys = match ($area) {
+            'Perut & Pinggang' => ['plank', 'wall sit'],
+            'Kaki & Paha' => ['wall sit'],
+            default => [],
+        };
+        $entries = $this->timedEntries();
+        return array_values(array_map(fn ($k) => $entries[$k], $keys));
+    }
+
+    /** Bentuk resmi gerakan berbasis waktu dari masukan luar; null bila namanya bukan salah satunya. */
     private function asTimedExercise(array $e): ?array
     {
-        if (ExerciseMedia::keyFor((string) ($e['name'] ?? '')) !== 'plank') {
+        $entries = $this->timedEntries();
+        $key = ExerciseMedia::keyFor((string) ($e['name'] ?? ''));
+        if (! isset($entries[$key])) {
             return null;
         }
-        $entry = $this->timedExerciseEntry();
+        $entry = $entries[$key];
         $setsReps = trim((string) ($e['sets_reps'] ?? ''));
         if ($setsReps !== '') {
             $entry['sets_reps'] = $setsReps;
@@ -410,7 +431,7 @@ class AiWorkoutService
         $n = ExerciseMedia::keyFor($name);
         $rules = [
             'Bokong (Glutes)' => ['hip thrust', 'glute', 'kickback', 'abduction', 'romanian deadlift', 'donkey kick'],
-            'Kaki & Paha' => ['leg curl', 'leg extension', 'leg press', 'squat', 'lunge', 'calf', 'step up', 'hack'],
+            'Kaki & Paha' => ['leg curl', 'leg extension', 'leg press', 'squat', 'lunge', 'calf', 'step up', 'hack', 'wall sit'],
             'Dada (Chest)' => ['chest press', 'bench press', 'pec', 'fly', 'dip'],
             'Punggung (Back)' => ['pulldown', 'pull up', 'pullup', 'row', 'deadlift', 'pullover', 'back extension'],
             'Perut & Pinggang' => ['crunch', 'twist', 'woodchopper', 'leg raise', 'sit up', 'plank'],
@@ -457,9 +478,11 @@ class AiWorkoutService
             $lib[$area] ?? [],
             fn ($it) => ! in_array(ExerciseMedia::keyFor($it['name']), $used, true)
         ));
-        // Ganti ke Plank juga ditawarkan untuk gerakan perut (pilihan manual pelatih).
-        if ($area === 'Perut & Pinggang' && ! in_array('plank', $used, true)) {
-            $out[] = $this->timedExerciseEntry();
+        // Ganti ke gerakan berbasis waktu juga ditawarkan (pilihan manual pelatih).
+        foreach ($this->timedForArea($area) as $entry) {
+            if (! in_array(ExerciseMedia::keyFor($entry['name']), $used, true)) {
+                $out[] = $entry;
+            }
         }
         return $out;
     }
@@ -552,9 +575,11 @@ class AiWorkoutService
             $lib[$area],
             fn ($it) => ! in_array(ExerciseMedia::keyFor($it['name']), $excl, true)
         ));
-        // Pilihan manual khusus area perut: Plank berbasis waktu (pengecualian beralat).
-        if ($area === 'Perut & Pinggang' && ! in_array('plank', $excl, true)) {
-            $out[] = $this->timedExerciseEntry();
+        // Pilihan manual berbasis waktu untuk area ini (pengecualian beralat, mis. Plank & Wall Sit).
+        foreach ($this->timedForArea($area) as $entry) {
+            if (! in_array(ExerciseMedia::keyFor($entry['name']), $excl, true)) {
+                $out[] = $entry;
+            }
         }
         return $out;
     }
