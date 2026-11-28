@@ -320,6 +320,7 @@ class AiWorkoutService
             'Lengan & Bahu' => [
                 $ex('Dumbbell Shoulder Press', 'dumbbell', '3 x 12', 4, 'Jaga perut tetap kencang.'),
                 $ex('Lateral Raise', 'dumbbell', '3 x 12', 2, 'Siku sedikit ditekuk, jangan diayun.'),
+                $ex('Front Raise', 'dumbbell', '3 x 12', 3, 'Angkat dumbbell ke depan sampai setinggi bahu, turun perlahan jangan diayun.'),
                 $ex('Bicep Curl', ['dumbbell', 'ez bar'], '3 x 12', 3, 'Siku tetap dekat badan.'),
                 $ex('Triceps Pushdown', 'cable', '3 x 12', 10, 'Siku menempel badan, tekan sampai lurus.'),
                 $ex('Shoulder Press Machine', 'shoulder press', '3 x 12', 10, 'Jangan kunci siku di atas.'),
