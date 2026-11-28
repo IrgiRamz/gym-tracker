@@ -78,30 +78,6 @@
     </div>
 </div>
 
-{{-- Ganti satu gerakan dengan gerakan lain satu area otot (dari live session) --}}
-<div class="modal fade" id="swapExerciseModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable" style="max-width:540px">
-        <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title fw-bold" id="swapExerciseTitle">Ganti Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body" id="swapExerciseBody"></div>
-        </div>
-    </div>
-</div>
-
-{{-- Tambah gerakan khusus sesi: pilih area otot, pilih dari pustaka atau buat dengan AI --}}
-<div class="modal fade" id="addExerciseModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable" style="max-width:540px">
-        <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title fw-bold">Tambah Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="small text-secondary mb-1">Bagian tubuh yang mau dilatih:</div>
-                <div id="addAreaChips" class="mb-2"></div>
-                <div id="addExerciseBody"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
 {{-- Atur gerakan hari ini sebelum sesi dimulai (khusus sesi ini, program tidak berubah) --}}
 <div class="modal fade" id="planModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-scrollable" style="max-width:540px">
@@ -132,6 +108,30 @@
                     <input type="number" class="form-control" id="planEditKg" step="0.5" min="0" inputmode="decimal"></div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-pink w-100" id="planEditSave">Simpan Target</button></div>
+        </div>
+    </div>
+</div>
+
+{{-- Ganti satu gerakan dengan gerakan lain satu area otot (dari live session) --}}
+<div class="modal fade" id="swapExerciseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="swapExerciseTitle">Ganti Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body" id="swapExerciseBody"></div>
+        </div>
+    </div>
+</div>
+
+{{-- Tambah gerakan khusus sesi: pilih area otot, pilih dari pustaka atau buat dengan AI --}}
+<div class="modal fade" id="addExerciseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable" style="max-width:540px">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold">Tambah Gerakan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="small text-secondary mb-1">Bagian tubuh yang mau dilatih:</div>
+                <div id="addAreaChips" class="mb-2"></div>
+                <div id="addExerciseBody"></div>
+            </div>
         </div>
     </div>
 </div>
