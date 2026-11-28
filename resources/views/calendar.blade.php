@@ -388,26 +388,35 @@
     }
     function closeLive() { panel.classList.remove('show'); document.body.style.overflow = ''; }
 
-    // Ikon mata di pojok kotak gerakan: lihat foto alat (hanya muncul bila alatnya punya foto).
-    document.getElementById('liveExercises').addEventListener('click', e => {
-        const b = e.target.closest('[data-eq-photo]'); if (!b) return;
-        const url = EQUIPMENT_IMAGES[b.dataset.eqPhoto]; if (!url) return;
-        document.getElementById('equipmentImageTitle').textContent = 'Foto ' + b.dataset.eqPhoto;
+    // Lihat foto alat (hanya muncul bila alatnya punya foto). Dipakai sesi live & modal rencana.
+    function showEquipmentPhoto(eqName) {
+        const url = EQUIPMENT_IMAGES[eqName]; if (!url) return;
+        document.getElementById('equipmentImageTitle').textContent = 'Foto ' + eqName;
         document.getElementById('equipmentImageImg').src = url;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('equipmentImageModal')).show();
+    }
+    document.getElementById('liveExercises').addEventListener('click', e => {
+        const b = e.target.closest('[data-eq-photo]'); if (b) showEquipmentPhoto(b.dataset.eqPhoto);
     });
 
-    // Ikon putar di pojok kotak gerakan: lihat contoh gerakan (hanya muncul bila gerakannya punya media).
-    document.getElementById('liveExercises').addEventListener('click', e => {
-        const b = e.target.closest('[data-mv-play]'); if (!b) return;
-        const m = EXERCISE_MEDIA[mvKey(b.dataset.mvPlay)]; if (!m) return;
-        document.getElementById('exerciseMediaTitle').textContent = 'Gerakan ' + b.dataset.mvPlay;
+    // Lihat contoh gerakan (hanya muncul bila gerakannya punya media). Dipakai sesi live & modal rencana.
+    function showExerciseMedia(exName) {
+        const m = EXERCISE_MEDIA[mvKey(exName)]; if (!m) return;
+        document.getElementById('exerciseMediaTitle').textContent = 'Gerakan ' + exName;
         const cr = document.getElementById('exerciseMediaCredit');
         if (m.credit) { cr.textContent = m.credit; cr.classList.remove('d-none'); } else { cr.textContent = ''; cr.classList.add('d-none'); }
         const vid = document.getElementById('exerciseMediaVideo'), img = document.getElementById('exerciseMediaImg');
         if (m.kind === 'video') { img.classList.add('d-none'); img.removeAttribute('src'); vid.classList.remove('d-none'); vid.src = m.url; vid.play().catch(() => {}); }
         else { vid.classList.add('d-none'); vid.pause(); vid.removeAttribute('src'); img.classList.remove('d-none'); img.src = m.url; }
         bootstrap.Modal.getOrCreateInstance(document.getElementById('exerciseMediaModal')).show();
+    }
+    document.getElementById('liveExercises').addEventListener('click', e => {
+        const b = e.target.closest('[data-mv-play]'); if (b) showExerciseMedia(b.dataset.mvPlay);
+    });
+    // Tombol yang sama di modal rencana sebelum mulai.
+    document.getElementById('planList').addEventListener('click', e => {
+        const eq = e.target.closest('[data-eq-photo]'); if (eq) { showEquipmentPhoto(eq.dataset.eqPhoto); return; }
+        const mv = e.target.closest('[data-mv-play]'); if (mv) showExerciseMedia(mv.dataset.mvPlay);
     });
 
     // Modal contoh gerakan ditutup: hentikan video agar tidak tetap berputar di latar.
@@ -595,6 +604,7 @@
             <div class="ex-row" data-index="${i}">
                 <span class="ex-grip float-start" title="Tahan dan geser untuk mengubah urutan"><i class="bi bi-grip-vertical"></i></span>
                 <div class="float-end d-flex gap-1">
+                    ${EXERCISE_MEDIA[mvKey(x.name)] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat contoh gerakan" data-mv-play="${esc(x.name)}"><i class="bi bi-play-circle"></i></button>` : ''}${EQUIPMENT_IMAGES[x.equipment] ? `<button type="button" class="btn btn-soft btn-sm" title="Lihat foto alat" data-eq-photo="${esc(x.equipment)}"><i class="bi bi-eye"></i></button>` : ''}
                     <button type="button" class="btn btn-soft btn-sm" title="Edit target gerakan ini untuk hari ini" data-plan-edit="${i}"><i class="bi bi-pencil"></i></button>
                     <button type="button" class="btn btn-soft btn-sm" title="Ganti gerakan ini untuk hari ini" data-plan-swap="${i}"><i class="bi bi-arrow-repeat"></i></button>
                     <button type="button" class="btn btn-soft btn-sm" title="Hapus gerakan ini dari sesi hari ini" data-plan-del="${i}"><i class="bi bi-trash"></i></button>
