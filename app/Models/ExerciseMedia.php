@@ -65,6 +65,11 @@ class ExerciseMedia extends Model
     public static function knownNames(): array
     {
         $names = static::pluck('name')->all();
+        // Seluruh pustaka bawaan ikut terdaftar agar pelatih bisa menyiapkan contoh
+        // gerakannya lebih dulu, sebelum gerakan itu masuk program klien mana pun.
+        $names = array_merge($names, app(\App\Services\AiWorkoutService::class)->libraryNames(
+            Equipment::where('is_available', true)->pluck('name')->all()
+        ));
         WorkoutProgram::where('is_active', true)->pluck('exercises_json')->each(function ($exercises) use (&$names) {
             foreach ($exercises ?? [] as $x) {
                 if (! empty($x['name'])) $names[] = (string) $x['name'];

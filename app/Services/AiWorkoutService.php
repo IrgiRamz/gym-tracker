@@ -71,6 +71,21 @@ class AiWorkoutService
         ];
     }
 
+    /** Semua nama gerakan yang dikenal aplikasi dari pustaka bawaan + gerakan berbasis waktu. */
+    public function libraryNames(array $equipmentNames): array
+    {
+        $names = [];
+        foreach ($this->buildLibrary($equipmentNames, false) as $exercises) {
+            foreach ($exercises as $e) {
+                $names[] = $e['name'];
+            }
+        }
+        foreach ($this->timedEntries() as $e) {
+            $names[] = $e['name'];
+        }
+        return $names;
+    }
+
     /** Gerakan berbasis waktu yang ditawarkan untuk satu area (pilihan manual pelatih). */
     private function timedForArea(string $area): array
     {
